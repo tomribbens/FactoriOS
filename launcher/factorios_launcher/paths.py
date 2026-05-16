@@ -7,6 +7,11 @@ VERSIONS = ROOT / "versions"
 USERS = ROOT / "users"
 LAST_USER = ROOT / "last-user"
 
+# Reserved names for the guest/demo flow. factorio.com usernames are
+# alphanumeric, so a leading underscore can never collide with a real one.
+GUEST_USER = "_guest"
+DEMO_VERSION = "_demo"
+
 
 def user_dir(username: str) -> Path:
     return USERS / username

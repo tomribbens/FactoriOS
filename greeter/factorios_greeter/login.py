@@ -15,15 +15,22 @@ from . import worker
 
 
 class LoginScreen(Gtk.Box):
-    """Emits `on_success(session, remember)` when login succeeds."""
+    """Emits `on_success(session, remember)` when login succeeds, or
+    `on_guest()` when the user picks the demo path.
+    """
 
-    def __init__(self, on_success: Callable[[Session, bool], None]) -> None:
+    def __init__(
+        self,
+        on_success: Callable[[Session, bool], None],
+        on_guest: Callable[[], None],
+    ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.set_margin_top(80)
         self.set_margin_bottom(80)
         self.set_margin_start(120)
         self.set_margin_end(120)
         self._on_success = on_success
+        self._on_guest = on_guest
 
         title = Gtk.Label(label="FactoriOS")
         title.add_css_class("title-1")
@@ -50,6 +57,13 @@ class LoginScreen(Gtk.Box):
         self.button.add_css_class("suggested-action")
         self.button.connect("clicked", self._on_clicked)
         self.append(self.button)
+
+        # Guest path — downloads and plays the demo, no account needed.
+        guest = Gtk.Button(label="Play demo (no account needed)")
+        guest.add_css_class("flat")
+        guest.set_halign(Gtk.Align.CENTER)
+        guest.connect("clicked", lambda *_: self._on_guest())
+        self.append(guest)
 
         # Submit on Enter from either entry.
         self.user_entry.connect("activate", lambda *_: self.pass_entry.grab_focus())

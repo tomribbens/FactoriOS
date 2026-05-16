@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import tarfile
 import tempfile
 from pathlib import Path
@@ -45,8 +46,36 @@ def install(session: Session, version: str, progress: ProgressCb | None = None) 
 
 
 def remove(version: str) -> None:
-    import shutil
-
     d = paths.version_dir(version)
     if d.exists():
         shutil.rmtree(d)
+
+
+def install_demo(session: Session | None = None, progress: ProgressCb | None = None) -> Path:
+    """Download and extract the Factorio demo. No-op if already installed.
+
+    The demo download endpoint is public, so `session` can be a fresh
+    `Session()` with no login cookies.
+    """
+    target = paths.version_dir(paths.DEMO_VERSION)
+    if paths.factorio_binary(paths.DEMO_VERSION).is_file():
+        return target
+
+    if session is None:
+        session = Session()
+
+    paths.VERSIONS.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(suffix=".tar.xz", delete=False) as tmp:
+        tarball = Path(tmp.name)
+    try:
+        download(session, tarball, version="latest", build="demo", progress=progress)
+        with tarfile.open(tarball, "r:xz") as tf:
+            tf.extractall(paths.VERSIONS)
+        extracted = paths.VERSIONS / "factorio"
+        if extracted.exists():
+            if target.exists():
+                shutil.rmtree(target)
+            extracted.rename(target)
+    finally:
+        tarball.unlink(missing_ok=True)
+    return target

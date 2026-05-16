@@ -25,6 +25,7 @@ def main() -> int:
     install.add_argument("version", help="e.g. 1.1.110 or latest")
 
     sub.add_parser("list", help="List installed versions")
+    sub.add_parser("demo", help="Download the Factorio demo (no auth needed)")
 
     args = p.parse_args()
 
@@ -47,6 +48,14 @@ def main() -> int:
             return 1
         s.save(paths.user_session(args.username))
         print(f"session saved to {paths.user_session(args.username)}")
+        return 0
+
+    if args.cmd == "demo":
+        def progress(done, total):
+            pct = (done / total * 100) if total else 0
+            print(f"\r{done/1e6:.1f} / {total/1e6:.1f} MB ({pct:.0f}%)", end="", flush=True)
+        versions.install_demo(progress=progress)
+        print()
         return 0
 
     if args.cmd == "install":

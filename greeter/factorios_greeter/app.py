@@ -12,6 +12,7 @@ from factorios_launcher.auth import Session
 
 from . import worker
 from .chooser import ChooserScreen
+from .demo import DemoScreen
 from .login import LoginScreen
 
 
@@ -55,10 +56,18 @@ class GreeterWindow(Gtk.ApplicationWindow):
     # --- screen swaps ----------------------------------------------------
 
     def _show_login(self) -> None:
-        self.set_child(LoginScreen(on_success=self._on_login_success))
+        self.set_child(LoginScreen(
+            on_success=self._on_login_success,
+            on_guest=self._show_demo,
+        ))
 
     def _show_chooser(self, session: Session) -> None:
         self.set_child(ChooserScreen(session, on_switch_user=self._on_switch_user))
+
+    def _show_demo(self) -> None:
+        # Guest mode is one-off: deliberately do *not* touch LAST_USER, so a
+        # remembered account stays remembered for the next boot.
+        self.set_child(DemoScreen(on_back=self._show_login))
 
     # --- callbacks -------------------------------------------------------
 
