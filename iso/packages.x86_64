@@ -1,0 +1,26 @@
+# Base live system bits.
+base
+linux
+linux-firmware
+mkinitcpio
+mkinitcpio-archiso
+
+# Networking in the live env (the installer needs to fetch packages).
+networkmanager
+iwd
+dhcpcd
+openssh
+
+# Installer dependencies.
+arch-install-scripts
+parted
+dosfstools
+e2fsprogs
+libnewt
+nano
+sudo
+which
+
+# Useful in the live env.
+less
+htop

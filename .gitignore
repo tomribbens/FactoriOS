@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# archiso build output
+iso/work/
+iso/out/
+*.iso
+
+# Arch package build artifacts
+packages/**/pkg/
+packages/**/src/
+packages/**/*.pkg.tar.*
+
+# Local repo staged into the airootfs by build.sh
+iso/airootfs/var/cache/factorios-repo/
+
+# Per-user Claude Code settings
+.claude/settings.local.json

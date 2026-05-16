@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factorios-greeter"
+version = "0.1.0"
+description = "GTK4 login + version/profile chooser for FactoriOS"
+requires-python = ">=3.11"
+dependencies = [
+    "factorios-launcher",
+    "PyGObject>=3.46",
+]
+
+[project.scripts]
+factorios-greeter = "factorios_greeter.app:main"
+
+[tool.setuptools.packages.find]
+include = ["factorios_greeter*"]

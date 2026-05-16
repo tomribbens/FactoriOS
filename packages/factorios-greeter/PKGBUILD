@@ -1,0 +1,33 @@
+# Maintainer: FactoriOS
+pkgname=factorios-greeter
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="GTK4 login + version/profile chooser for FactoriOS"
+arch=('any')
+url="https://example.invalid/factorios"
+license=('MIT')
+depends=(
+    'python'
+    'python-gobject'
+    'gtk4'
+    'factorios-launcher'
+)
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+source=()
+options=(!debug)
+
+# Monorepo: pull the greeter/ source tree from two levels up.
+prepare() {
+    rm -rf "$srcdir/greeter"
+    cp -r "$startdir/../../greeter" "$srcdir/greeter"
+}
+
+build() {
+    cd "$srcdir/greeter"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$srcdir/greeter"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+}

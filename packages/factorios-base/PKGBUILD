@@ -1,0 +1,31 @@
+# Maintainer: FactoriOS
+#
+# Meta-package: pulls in everything an installed FactoriOS system needs and
+# drops the systemd unit + the factorios system user.
+pkgname=factorios-base
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="FactoriOS system glue: factorios user, systemd unit, kiosk session"
+arch=('any')
+url="https://example.invalid/factorios"
+license=('MIT')
+depends=(
+    'factorios-greeter'
+    'factorios-launcher'
+    'labwc'
+    'seatd'
+    'mesa'
+    'vulkan-icd-loader'
+    'networkmanager'
+)
+source=()
+install=factorios-base.install
+
+prepare() {
+    cp "$startdir/../../systemd/factorios.service" "$srcdir/factorios.service"
+}
+
+package() {
+    install -Dm644 "$srcdir/factorios.service" \
+        "$pkgdir/usr/lib/systemd/system/factorios.service"
+}

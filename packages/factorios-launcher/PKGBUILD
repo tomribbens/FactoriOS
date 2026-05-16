@@ -1,0 +1,33 @@
+# Maintainer: FactoriOS
+pkgname=factorios-launcher
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="factorio.com auth, downloads, and version/profile management for FactoriOS"
+arch=('any')
+url="https://example.invalid/factorios"
+license=('MIT')
+depends=('python' 'python-requests')
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+source=()
+options=(!debug)
+
+# Monorepo: pull the launcher/ source tree from two levels up.
+prepare() {
+    rm -rf "$srcdir/launcher"
+    cp -r "$startdir/../../launcher" "$srcdir/launcher"
+}
+
+build() {
+    cd "$srcdir/launcher"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$srcdir/launcher"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+
+    # /var/lib/factorios is owned by this package.
+    install -d -m 0755 "$pkgdir/var/lib/factorios"
+    install -d -m 0755 "$pkgdir/var/lib/factorios/versions"
+    install -d -m 0755 "$pkgdir/var/lib/factorios/users"
+}

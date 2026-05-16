@@ -1,0 +1,28 @@
+[Unit]
+Description=FactoriOS session (labwc + greeter on tty1)
+After=systemd-user-sessions.service plymouth-quit-wait.service seatd.service
+Conflicts=getty@tty1.service
+Wants=seatd.service
+
+[Service]
+Type=simple
+User=factorios
+Group=factorios
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+Environment=XDG_SESSION_TYPE=wayland
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WLR_LIBINPUT_NO_DEVICES=1
+# labwc -s CMD runs CMD on startup. The greeter is the entire session.
+ExecStartPre=/usr/bin/install -d -o factorios -g factorios -m 700 /run/user/1000
+ExecStart=/usr/bin/labwc -s /usr/bin/factorios-greeter
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical.target
