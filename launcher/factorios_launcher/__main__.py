@@ -23,6 +23,13 @@ def main() -> int:
     install = sub.add_parser("install", help="Download and install a version")
     install.add_argument("username")
     install.add_argument("version", help="e.g. 1.1.110 or latest")
+    install.add_argument(
+        "build",
+        nargs="?",
+        choices=list(paths.ALL_BUILDS),
+        default=paths.DEFAULT_BUILD,
+        help=f"vanilla or space-age (default: {paths.DEFAULT_BUILD})",
+    )
 
     sub.add_parser("list", help="List installed versions")
     sub.add_parser("demo", help="Download the Factorio demo (no auth needed)")
@@ -35,8 +42,8 @@ def main() -> int:
         return 0
 
     if args.cmd == "list":
-        for v in versions.list_installed():
-            print(v)
+        for v, b in versions.list_installed():
+            print(f"{v}\t{b}")
         return 0
 
     if args.cmd == "login":
@@ -67,7 +74,7 @@ def main() -> int:
         def progress(done, total):
             pct = (done / total * 100) if total else 0
             print(f"\r{done/1e6:.1f} / {total/1e6:.1f} MB ({pct:.0f}%)", end="", flush=True)
-        versions.install(s, args.version, progress=progress)
+        versions.install(s, args.version, build=args.build, progress=progress)
         print()
         return 0
 

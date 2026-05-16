@@ -24,14 +24,19 @@ No local Linux user accounts are ever created. One shared system user runs sessi
 
 ```
 /var/lib/factorios/
-  versions/<version>/         # shared, system-wide
+  versions/
+    <version>-<build>/        # build ∈ {vanilla, space-age}; shared system-wide
+    _demo/                    # demo install; no build dimension
   users/<factorio-username>/
-    profiles/<profile-name>/  # one Factorio --write-data target per profile
+    profiles/<build>/<name>/  # per-build profiles
     session.json
+  users/_guest/profiles/<n>/  # guest/demo profiles (flat — no build dim)
   last-user                   # present iff Remember Me
 ```
 
-`launcher/factorios_launcher/paths.py` is the single source of truth for these paths — don't hard-code them elsewhere.
+`launcher/factorios_launcher/paths.py` is the single source of truth — don't hard-code these elsewhere. Build identifiers are `vanilla` / `space-age` user-facing; the factorio.com download API uses `alpha` / `expansion` — the mapping lives in `paths.BUILD_API` and the rest of the codebase never deals in alpha/expansion. Profiles are per-build because mod compatibility differs across the two; the guest/demo flow is flat (no build dim) because the demo is its own build.
+
+Space Age ownership lives on `Session.has_space_age` (refreshed on every `login()` / `validate()` via a HEAD probe against the expansion download endpoint, never persisted). The chooser hides the Build selector when `has_space_age == False`.
 
 ## factorio.com auth flow
 

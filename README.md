@@ -44,12 +44,20 @@ There are no local Linux user accounts. A single system user (`factorios`) runs 
 
 ```
 /var/lib/factorios/
-  versions/<version>/            # extracted Factorio install (shared system-wide)
+  versions/
+    <version>-vanilla/           # base game install
+    <version>-space-age/         # Space Age DLC install
+    _demo/                       # demo install (no build dimension)
   users/<factorio-username>/
-    profiles/<profile-name>/     # one Factorio --write-data per profile (mods, saves, config)
+    profiles/
+      vanilla/<profile-name>/    # per-build profile (mods, saves, config)
+      space-age/<profile-name>/
     session.json                 # cached factorio.com session cookies
+  users/_guest/profiles/<name>/  # guest/demo profiles (flat — no build dim)
   last-user                      # only present when Remember Me was checked
 ```
+
+Profiles are per-build because mod compatibility differs across Vanilla and Space Age. Space Age ownership is detected at login time via a HEAD probe against the expansion download endpoint; if you only own Vanilla, the greeter hides the Build selector entirely.
 
 ## Build
 
