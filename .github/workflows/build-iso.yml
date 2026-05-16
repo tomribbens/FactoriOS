@@ -15,7 +15,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build ISO in Arch container
         # mkarchiso needs CAP_SYS_ADMIN, loop devices, and the ability to
@@ -54,7 +54,7 @@ jobs:
           echo "name=$(basename "$path")" >> "$GITHUB_OUTPUT"
 
       - name: Upload ISO as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.iso.outputs.name }}
           path: ${{ steps.iso.outputs.path }}
@@ -63,7 +63,7 @@ jobs:
 
       - name: Attach ISO to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ${{ steps.iso.outputs.path }}
           generate_release_notes: true
