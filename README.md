@@ -32,7 +32,9 @@ systemd/     factorios.service + supporting config
               # inside the airootfs, then runs mkarchiso. Output: iso/out/*.iso
 ```
 
-Requires `archiso`, `pacman`, `base-devel` on the build host. Run as a user that can `sudo` (mkarchiso needs root).
+Requires `archiso`, `pacman`, `base-devel` on the build host. Run as a regular user with sudo access — `makepkg` runs as you, `mkarchiso` self-elevates.
+
+CI also builds the ISO: see `.github/workflows/build-iso.yml`. Every push to `main` produces a downloadable artifact on the workflow run; tag pushes (`v*`) attach the ISO to a GitHub Release.
 
 ## Identity model
 

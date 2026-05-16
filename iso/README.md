@@ -9,10 +9,10 @@ You almost never want to run this directly — use the top-level `./build.sh` in
 If the packages are already staged, this script alone builds the ISO:
 
 ```
-sudo iso/build.sh
+iso/build.sh
 ```
 
-It stages `installer/install.sh` into `airootfs/usr/local/bin/factorios-install` and then runs `mkarchiso -v -w iso/work -o iso/out iso/`. Output lands in `iso/out/`.
+Run it as a regular user with sudo access — `mkchiso` needs root, so the script re-execs itself under `sudo` when not already root, and `chown`s the resulting `work/` and `out/` back to the calling user afterwards. It stages `installer/install.sh` into `airootfs/usr/local/bin/factorios-install` and then runs `mkarchiso -v -w iso/work -o iso/out iso/`. Output lands in `iso/out/`.
 
 ## Two pacman.conf files, on purpose
 
