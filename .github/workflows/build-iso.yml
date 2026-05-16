@@ -30,8 +30,10 @@ jobs:
               # Fresh keyring first; the base image is sometimes a few weeks stale.
               pacman -Sy --noconfirm archlinux-keyring
               pacman -Syu --noconfirm
+              # `grub` provides grub-install / grub-mkrescue, needed by the
+              # uefi.grub bootmode. archiso itself does not depend on it.
               pacman -S --noconfirm --needed \
-                archiso base-devel sudo \
+                archiso grub base-devel sudo \
                 python python-build python-installer python-setuptools python-wheel
 
               # makepkg refuses to run as root, so do the whole build as an

@@ -3,19 +3,14 @@
 
 iso_name="factorios"
 iso_label="FACTORIOS_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
-iso_publisher="FactoriOS <https://example.invalid/factorios>"
-iso_application="FactoriOS Live/Install Medium"
+iso_publisher="FactoriOS <https://github.com/tomribbens/FactoriOS>"
+iso_application="FactoriOS Installer"
 iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
 install_dir="factorios"
 buildmodes=('iso')
-bootmodes=(
-    'bios.syslinux.mbr'
-    'bios.syslinux.eltorito'
-    'uefi-ia32.grub.esp'
-    'uefi-x64.grub.esp'
-    'uefi-ia32.grub.eltorito'
-    'uefi-x64.grub.eltorito'
-)
+# UEFI only — the installer is UEFI-only too. Keeps the profile small and
+# matches the "do nothing extra" premise.
+bootmodes=('uefi.grub')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
