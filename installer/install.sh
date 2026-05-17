@@ -94,6 +94,12 @@ echo "$HOSTNAME" > /etc/hostname
 # factorios system user, fixed UID so XDG_RUNTIME_DIR is predictable.
 id factorios &>/dev/null || useradd -r -m -u 1000 -s /usr/bin/nologin -G seat,video,input factorios
 
+# Passwordless root for tty/console recovery. Appliance-OS pattern:
+# factorio.com is the real auth surface, root only exists so anyone with
+# physical access can debug when labwc/the greeter falls over. The kiosk
+# session doesn't expose a shell, so this isn't a remote-access risk.
+passwd -d root
+
 # Bootloader.
 bootctl install
 # Verbose-by-default boot: show the systemd-boot menu for a few seconds
