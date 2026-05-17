@@ -5,6 +5,12 @@ linux-firmware
 mkinitcpio
 mkinitcpio-archiso
 
+# Boot loaders. syslinux is required for the bios.syslinux bootmode (its
+# isolinux.bin / menu.c32 etc. are pulled from this package at ISO build
+# time). grub is also pulled in by the workflow's container packages so
+# grub-install is on PATH for the uefi.grub bootmode.
+syslinux
+
 # Networking in the live env (the installer needs to fetch packages).
 networkmanager
 iwd

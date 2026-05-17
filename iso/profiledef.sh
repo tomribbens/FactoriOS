@@ -8,9 +8,10 @@ iso_application="FactoriOS Installer"
 iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
 install_dir="factorios"
 buildmodes=('iso')
-# UEFI only — the installer is UEFI-only too. Keeps the profile small and
-# matches the "do nothing extra" premise.
-bootmodes=('uefi.grub')
+# BIOS + UEFI so VirtualBox's default (BIOS) VMs Just Work without the user
+# having to flip the firmware setting. The installer itself is still
+# UEFI-only — these bootmodes are about getting the live ISO booted.
+bootmodes=('bios.syslinux' 'uefi.grub')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"

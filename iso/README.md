@@ -21,12 +21,12 @@ Run it as a regular user with sudo access — `mkchiso` needs root, so the scrip
 
 ## Boot config
 
-UEFI-only via grub (`bootmodes=('uefi.grub')`). No BIOS, no syslinux — the installer is UEFI-only anyway, and this keeps the profile minimal.
+Hybrid BIOS + UEFI (`bootmodes=('bios.syslinux' 'uefi.grub')`). The installer itself is still UEFI-only — these bootmodes are about getting the live ISO to boot, primarily so VirtualBox VMs (which default to BIOS firmware) work without the user having to enable EFI by hand.
 
-- `grub/grub.cfg` — live ISO grub menu.
-- `grub/loopback.cfg` — variant used when the ISO is chainloaded from another bootloader (e.g. ventoy).
+- `grub/grub.cfg` + `grub/loopback.cfg` — UEFI grub menu, plus a loopback variant for when the ISO is chainloaded from another bootloader (e.g. ventoy).
+- `syslinux/syslinux.cfg` + `syslinux/syslinux-linux.cfg` — BIOS syslinux menu.
 
-Building requires the `grub` package on the build host (for `grub-install`/`grub-mkrescue`); the CI workflow installs it.
+Building requires the `grub` package on the build host (for `grub-install`/`grub-mkrescue`); the CI workflow installs it. The `syslinux` package is in `packages.x86_64` so its boot files are present in the live env for mkarchiso to copy.
 
 ## airootfs layout (what we add on top of archiso defaults)
 
