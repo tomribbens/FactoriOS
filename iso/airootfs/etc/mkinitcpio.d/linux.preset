@@ -1,0 +1,12 @@
+# mkinitcpio preset for the `linux` package on FactoriOS.
+#
+# Overrides the default linux.preset so that pacstrap (and any later
+# mkinitcpio run during ISO build) produces an archiso-capable initrd,
+# using the hooks defined in /etc/mkinitcpio.conf.d/archiso.conf.
+
+PRESETS=('archiso')
+
+ALL_kver='/boot/vmlinuz-linux'
+archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
+
+archiso_image="/boot/initramfs-linux.img"
