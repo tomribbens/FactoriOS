@@ -1,21 +1,21 @@
-# Base live system bits.
+# Base live system bits. linux-firmware is intentionally NOT included in
+# the default (slim) build — VMs use virtio devices that need no firmware,
+# and the installed system pacstraps linux-firmware separately. The 'full'
+# variant of iso/build.sh re-adds it for the release ISO that also boots
+# bare metal with WiFi or specific GPU firmware needs.
 base
 linux
-linux-firmware
 mkinitcpio
 mkinitcpio-archiso
 
-# Boot loaders. syslinux is required for the bios.syslinux bootmode (its
-# isolinux.bin / menu.c32 etc. are pulled from this package at ISO build
-# time). grub is also pulled in by the workflow's container packages so
-# grub-install is on PATH for the uefi.grub bootmode.
+# Boot loaders.
 syslinux
 
-# Networking in the live env (the installer needs to fetch packages).
+# Networking in the live env. NetworkManager has its own DHCP, so no
+# dhcpcd. iwd stays so WiFi works on the full variant; it costs ~5MB and
+# does nothing without devices that need it.
 networkmanager
 iwd
-dhcpcd
-openssh
 
 # Installer dependencies.
 arch-install-scripts
@@ -29,4 +29,3 @@ which
 
 # Useful in the live env.
 less
-htop

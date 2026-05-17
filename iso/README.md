@@ -6,13 +6,16 @@ Produces the FactoriOS installer ISO. Boot it, it autologs root on tty1, and (if
 
 You almost never want to run this directly — use the top-level `./build.sh` instead, which builds the PKGBUILDs and stages them into the airootfs as a local repo before invoking this script.
 
-If the packages are already staged, this script alone builds the ISO:
+If the packages are already staged (i.e., `./build.sh` ran successfully before), this script builds an ISO without re-running the PKGBUILDs:
 
 ```
-iso/build.sh
+iso/build.sh           # slim variant (default)
+iso/build.sh full      # full variant — adds linux-firmware
 ```
 
-Run it as a regular user with sudo access — `mkchiso` needs root, so the script re-execs itself under `sudo` when not already root, and `chown`s the resulting `work/` and `out/` back to the calling user afterwards. It stages `installer/install.sh` into `airootfs/usr/local/bin/factorios-install` and then runs `mkarchiso -v -w iso/work -o iso/out iso/`. Output lands in `iso/out/`.
+The full variant temporarily appends `linux-firmware` to `packages.x86_64` and exports `FACTORIOS_VARIANT=full`; `profiledef.sh` uses that env var to tag the output filename, so slim and full ISOs coexist in `iso/out/`. A cleanup trap restores `packages.x86_64` no matter how the script exits.
+
+Run as a regular user with sudo access — `mkarchiso` needs root, so the script invokes it via `sudo` and `chown`s the resulting `work/` and `out/` trees back to the caller afterwards.
 
 ## Two pacman.conf files, on purpose
 

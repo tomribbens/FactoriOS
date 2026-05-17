@@ -28,13 +28,15 @@ systemd/     factorios.service + supporting config
 ## Build
 
 ```
-./build.sh    # builds all three PKGBUILDs, stages them into a local repo
-              # inside the airootfs, then runs mkarchiso. Output: iso/out/*.iso
+./build.sh           # slim ISO (~150 MB). Default. Works in VMs and on
+                     # bare metal with ethernet + Intel/AMD GPUs.
+./build.sh full      # full ISO (~800 MB) — same plus linux-firmware for
+                     # WiFi and modern AMD/NVidia firmware needs.
 ```
 
-Requires `archiso`, `pacman`, `base-devel` on the build host. Run as a regular user with sudo access — `makepkg` runs as you, `mkarchiso` self-elevates.
+Both write to `iso/out/`. Requires `archiso`, `pacman`, `base-devel`, `erofs-utils` on the build host. Run as a regular user with sudo access — `makepkg` runs as you, `mkarchiso` runs under sudo from inside the scripts.
 
-CI also builds the ISO: see `.github/workflows/build-iso.yml`. Every push to `main` produces a downloadable artifact on the workflow run; tag pushes (`v*`) attach the ISO to a GitHub Release.
+CI also builds the ISO(s): see `.github/workflows/build-iso.yml`. Every push to `main` produces a slim ISO as a downloadable artifact. Tag pushes (`v*`) additionally build the full ISO and attach **both** to the GitHub Release.
 
 ## Identity model
 

@@ -57,4 +57,4 @@ log "packages staged:"
 ls -1 "$REPO_DIR"
 
 log "handing off to iso/build.sh"
-exec "$HERE/iso/build.sh"
+exec "$HERE/iso/build.sh" "$@"

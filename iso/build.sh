@@ -1,31 +1,61 @@
 #!/bin/bash
-# Build the FactoriOS installer ISO.
+# Build a FactoriOS installer ISO.
 #
-# Stages the installer script into the archiso airootfs, then invokes
-# mkarchiso. mkarchiso requires root (chroot/mount/loop); if we're not root
-# already, re-exec under sudo so callers don't have to think about it.
+# Usage:  iso/build.sh [slim|full]   (default: slim)
 #
-# The work and out dirs end up root-owned because mkarchiso runs as root.
-# We chown them back to SUDO_USER at the end so a regular-user `./build.sh`
-# leaves no root-owned artifacts behind.
+#   slim  — default. No linux-firmware; ~150–200 MB ISO. Works in VMs and
+#           on bare metal with ethernet + Intel/AMD GPUs that don't need
+#           firmware blobs.
+#   full  — adds linux-firmware (~600 MB). For the release ISO that should
+#           boot on bare metal with WiFi or modern AMD/NVidia GPUs.
+#
+# Caller must be a regular user with sudo (mkarchiso needs root). We
+# explicitly do NOT `exec sudo` ourselves — that would skip the cleanup
+# trap that restores packages.x86_64 after a full build mutates it.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 
-# Stage the installer (cheap, fine to do twice if we re-exec).
+VARIANT="${1:-slim}"
+case "$VARIANT" in
+    slim|full) ;;
+    *) echo "error: unknown variant '$VARIANT' (use slim or full)" >&2; exit 2 ;;
+esac
+
+# Stage the installer into the airootfs.
 install -Dm755 "$REPO/installer/install.sh" "$HERE/airootfs/usr/local/bin/factorios-install"
 
-mkdir -p "$HERE/out" "$HERE/work"
+mkdir -p "$HERE/out"
+rm -rf "$HERE/work"
 
-if [[ $EUID -ne 0 ]]; then
-    # Pass our UID through so the post-build chown can target the caller.
-    exec sudo --preserve-env=SUDO_USER FACTORIOS_CALLER_UID="$(id -u)" FACTORIOS_CALLER_GID="$(id -g)" "$0" "$@"
+# The full variant temporarily appends linux-firmware to packages.x86_64
+# (mkarchiso has no "extra-packages" flag). The trap restores the file no
+# matter how we exit so the source tree stays pristine.
+PKGS_FILE="$HERE/packages.x86_64"
+cleanup() {
+    if [[ -f "$PKGS_FILE.bak" ]]; then
+        mv -f "$PKGS_FILE.bak" "$PKGS_FILE"
+    fi
+}
+trap cleanup EXIT
+
+if [[ "$VARIANT" == "full" ]]; then
+    cp "$PKGS_FILE" "$PKGS_FILE.bak"
+    cat <<'EOF' >> "$PKGS_FILE"
+
+# --- Added by iso/build.sh full ---
+linux-firmware
+EOF
+    export FACTORIOS_VARIANT=full
 fi
 
-mkarchiso -v -w "$HERE/work" -o "$HERE/out" "$HERE"
-
-# Hand the build artifacts back to the calling user if we self-elevated.
-if [[ -n "${FACTORIOS_CALLER_UID:-}" ]]; then
-    chown -R "$FACTORIOS_CALLER_UID:$FACTORIOS_CALLER_GID" "$HERE/work" "$HERE/out"
+# Run mkarchiso as root (sudo if we're not already).
+if [[ $EUID -eq 0 ]]; then
+    mkarchiso -v -w "$HERE/work" -o "$HERE/out" "$HERE"
+else
+    sudo --preserve-env=FACTORIOS_VARIANT \
+        mkarchiso -v -w "$HERE/work" -o "$HERE/out" "$HERE"
+    # mkarchiso left the work/out trees root-owned; hand them back.
+    sudo chown -R "$(id -u):$(id -g)" "$HERE/work" "$HERE/out"
 fi

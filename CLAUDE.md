@@ -44,7 +44,9 @@ GET `https://www.factorio.com/login` → scrape `input[name=csrf_token]` → POS
 
 ## Build
 
-`./build.sh` is the only entry point. It (1) runs `makepkg` for the three PKGBUILDs in dependency order, (2) `repo-add`s the results into `iso/airootfs/var/cache/factorios-repo/`, and (3) execs `iso/build.sh`, which stages the installer script and runs `mkarchiso`. The repo dir is gitignored and recreated every run.
+`./build.sh [slim|full]` is the entry point. It (1) runs `makepkg` for the three PKGBUILDs in dependency order, (2) `repo-add`s the results into `iso/airootfs/var/cache/factorios-repo/`, and (3) execs `iso/build.sh "$@"`, which stages the installer script and runs `mkarchiso`. The repo dir is gitignored and recreated every run.
+
+Two ISO variants share one profile: **slim** (default — no linux-firmware, ~150 MB) and **full** (adds linux-firmware, ~800 MB). `iso/build.sh` selects the variant via `$1`; for full it temporarily appends `linux-firmware` to `packages.x86_64` (cleanup via trap) and exports `FACTORIOS_VARIANT=full`, which `profiledef.sh` substitutes into `iso_name` so the outputs don't collide. CI builds slim every push and additionally builds full on tag pushes (`v*`), attaching both to the release.
 
 PKGBUILDs pull their source out of the monorepo via `$startdir/../../<dir>` in `prepare()` — no manual file shuffling, no tarballs. Don't add `source=()` URLs; keep the monorepo-relative pattern.
 
