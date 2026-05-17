@@ -13,6 +13,16 @@ if [[ "$(tty)" == "/dev/tty1" ]]; then
  └─────────────────────────────────────────────────┘
 
 BANNER
+    # Initialize the pacman keyring if mkarchiso didn't pre-seed one for us
+    # (otherwise the installer's pacstrap fails with "keyring is not
+    # writable" because pacman tries and fails to import keys on demand).
+    if [[ ! -s /etc/pacman.d/gnupg/pubring.gpg ]]; then
+        echo "Initializing pacman keyring (one-off, ~10s)…"
+        pacman-key --init >/dev/null 2>&1
+        pacman-key --populate archlinux >/dev/null 2>&1
+        echo
+    fi
+
     if ping -c1 -W2 archlinux.org >/dev/null 2>&1; then
         /usr/local/bin/factorios-install
     else
