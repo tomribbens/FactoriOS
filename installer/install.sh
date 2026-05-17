@@ -96,16 +96,19 @@ id factorios &>/dev/null || useradd -r -m -u 1000 -s /usr/bin/nologin -G seat,vi
 
 # Bootloader.
 bootctl install
+# Verbose-by-default boot: show the systemd-boot menu for a few seconds
+# and let the kernel log to the console. The compositor still owns tty1
+# once factorios.service starts, so this only affects very early boot.
 cat > /boot/loader/loader.conf <<LOADER
 default factorios
-timeout 0
+timeout 3
 console-mode max
 LOADER
 cat > /boot/loader/entries/factorios.conf <<ENTRY
 title   FactoriOS
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=PARTUUID=$(blkid -s PARTUUID -o value "$ROOT") rw quiet
+options root=PARTUUID=$(blkid -s PARTUUID -o value "$ROOT") rw
 ENTRY
 
 systemctl enable NetworkManager.service
