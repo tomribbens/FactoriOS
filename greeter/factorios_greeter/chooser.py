@@ -70,6 +70,14 @@ class ChooserScreen(Gtk.Box):
         version_row.append(self.delete_version_button)
         self.append(version_row)
 
+        # Per-build cache of (stable, experimental) from latest-releases,
+        # populated lazily by _refresh_update_hint. {} = not fetched yet.
+        self._releases: dict[str, tuple[str | None, str | None]] = {}
+        self.update_hint = Gtk.Label(label="", xalign=0)
+        self.update_hint.add_css_class("dim-label")
+        self.update_hint.set_visible(False)
+        self.append(self.update_hint)
+
         # --- Profile row -------------------------------------------------
         self.append(Gtk.Label(label="Profile", xalign=0))
         profile_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -108,6 +116,7 @@ class ChooserScreen(Gtk.Box):
 
         self._refresh_versions()
         self._refresh_profiles()
+        self._refresh_update_hint()
 
     # --- helpers ---------------------------------------------------------
 
@@ -117,6 +126,7 @@ class ChooserScreen(Gtk.Box):
             self._build = self._build_order[idx]
             self._refresh_versions()
             self._refresh_profiles()
+            self._refresh_update_hint()
 
     def _refresh_versions(self) -> None:
         installed = versions.list_installed_for_build(self._build)
@@ -124,6 +134,59 @@ class ChooserScreen(Gtk.Box):
         self.version_combo.set_model(model)
         self.launch_button.set_sensitive(bool(installed))
         self.delete_version_button.set_sensitive(bool(installed))
+
+    def _refresh_update_hint(self) -> None:
+        """Compare latest stable for the current build against the newest
+        installed version and show a hint when there's an upgrade
+        available. Lazy-fetches latest-releases on first request per build
+        and caches per-session (no automatic invalidation — re-login to
+        refresh)."""
+        build = self._build
+        cached = self._releases.get(build)
+
+        def render(stable: str | None, experimental: str | None) -> None:
+            installed = versions.list_installed_for_build(build)
+            newest = max(installed, key=lambda v: tuple(int(x) for x in v.split(".") if x.isdigit()), default=None) if installed else None
+            parts: list[str] = []
+            if stable and (newest is None or is_newer(stable, newest)):
+                if newest is None:
+                    parts.append(f"Latest stable: {stable}")
+                else:
+                    parts.append(f"Update available: {stable} (you have {newest})")
+            if experimental and is_newer(experimental, stable or "") and (newest is None or is_newer(experimental, newest)):
+                parts.append(f"experimental: {experimental}")
+            text = " · ".join(parts)
+            self.update_hint.set_label(text)
+            self.update_hint.set_visible(bool(text))
+
+        if cached is not None:
+            render(*cached)
+            return
+
+        # Not fetched yet — hide hint and fetch in the background.
+        self.update_hint.set_visible(False)
+
+        def fetch():
+            releases = latest_releases(self.session)
+            api = paths.BUILD_API[build]
+            return (
+                releases.get("stable", {}).get(api),
+                releases.get("experimental", {}).get(api),
+            )
+
+        def done(result):
+            self._releases[build] = result
+            # User may have switched build between fetch start and now; only
+            # render if the current build still matches the fetched one.
+            if self._build == build:
+                render(*result)
+
+        def failed(_exc):
+            # Silently swallow — an update hint isn't important enough to
+            # surface a network error in the status line.
+            pass
+
+        worker.run(fetch, on_done=done, on_error=failed)
 
     def _refresh_profiles(self) -> None:
         on_disk = profiles.list_profiles(self.session.username, build=self._build)
@@ -364,6 +427,7 @@ class ChooserScreen(Gtk.Box):
             self.progress.set_visible(False)
             self.status.set_label(f"Installed {build_label} {version}.")
             self._refresh_versions()
+            self._refresh_update_hint()
 
         def failed(exc):
             self.install_button.set_sensitive(True)
