@@ -35,32 +35,42 @@ whiptail --title "Confirm" --yesno \
 # (the more expressive namespace); the console keymap is derived via the
 # XKB_TO_KEYMAP table below.
 KEYBOARD_LAYOUTS=(
-    us  "US English (QWERTY)"
-    gb  "British English"
-    ie  "Irish"
-    de  "German"
-    fr  "French (AZERTY)"
-    be  "Belgian (AZERTY)"
-    es  "Spanish"
-    it  "Italian"
-    pt  "Portuguese"
-    br  "Brazilian"
-    nl  "Dutch"
-    no  "Norwegian"
-    se  "Swedish"
-    dk  "Danish"
-    fi  "Finnish"
-    ch  "Swiss German"
-    "ch(fr)" "Swiss French"
-    pl  "Polish"
-    cz  "Czech"
-    hu  "Hungarian"
-    ru  "Russian"
-    jp  "Japanese"
-    other "(type a custom layout name)"
+    us           "US English (QWERTY)"
+    "us(dvorak)" "US English (Dvorak)"
+    "us(colemak)" "US English (Colemak)"
+    "us(intl)"   "US English (international, dead keys)"
+    gb           "British English"
+    ie           "Irish"
+    de           "German"
+    fr           "French (AZERTY)"
+    be           "Belgian (AZERTY)"
+    es           "Spanish"
+    it           "Italian"
+    pt           "Portuguese"
+    br           "Brazilian"
+    nl           "Dutch"
+    no           "Norwegian"
+    se           "Swedish"
+    dk           "Danish"
+    fi           "Finnish"
+    ch           "Swiss German"
+    "ch(fr)"     "Swiss French"
+    pl           "Polish"
+    cz           "Czech"
+    hu           "Hungarian"
+    ru           "Russian"
+    jp           "Japanese"
+    other        "(type a custom layout — see below)"
 )
+# console keymap names corresponding to each XKB layout(variant) above.
+# When no entry exists for a key, the bash lookup falls through to the
+# XKB layout name itself — which works for many simple layouts and
+# fails gracefully (vconsole.conf gets ignored) for the rest.
 declare -A XKB_TO_KEYMAP=(
     [us]=us
+    ["us(dvorak)"]=dvorak
+    ["us(colemak)"]=colemak
+    ["us(intl)"]=us-acentos
     [gb]=uk
     [ie]=ie
     [de]=de-latin1
@@ -88,8 +98,8 @@ XKB_LAYOUT=$(whiptail --title "Keyboard layout" \
     "${KEYBOARD_LAYOUTS[@]}" 3>&1 1>&2 2>&3)
 if [[ "$XKB_LAYOUT" == "other" ]]; then
     XKB_LAYOUT=$(whiptail --title "Keyboard layout" \
-        --inputbox "XKB layout name (e.g. us, gb, de, dvorak)" \
-        10 60 us 3>&1 1>&2 2>&3)
+        --inputbox "XKB layout, optionally with a variant in parens.\nExamples: us, gb, us(dvorak), de(neo), fr(bepo)" \
+        12 70 us 3>&1 1>&2 2>&3)
 fi
 # Strip an optional XKB variant in parens — we currently only special-case
 # Swiss French ("ch(fr)") and don't expose other variants.
