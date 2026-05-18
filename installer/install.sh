@@ -28,7 +28,47 @@ whiptail --title "Confirm" --yesno \
     "Wipe $DISK and install FactoriOS?\n\nThis cannot be undone." 10 60 \
     || die "aborted"
 
-# --- 2. Optional pre-seed factorio.com creds ----------------------------
+# --- 2. Keyboard layout -------------------------------------------------
+# Ask before any text input so the user types subsequent answers using
+# their real layout. The same value also goes into /mnt/etc/vconsole.conf
+# so the installed system boots with the right console keymap.
+KEYBOARD_LAYOUTS=(
+    us      "US English (QWERTY)"
+    us-acentos "US English (international)"
+    gb      "British English"
+    ie      "Irish"
+    de-latin1 "German"
+    fr-latin1 "French (AZERTY)"
+    be-latin1 "Belgian (AZERTY)"
+    es      "Spanish"
+    it      "Italian"
+    pt-latin1 "Portuguese"
+    br-abnt2 "Brazilian (ABNT2)"
+    nl      "Dutch"
+    no-latin1 "Norwegian"
+    sv-latin1 "Swedish"
+    dk-latin1 "Danish"
+    fi-latin1 "Finnish"
+    de_CH-latin1 "Swiss German"
+    fr_CH-latin1 "Swiss French"
+    pl      "Polish"
+    cz-lat2 "Czech"
+    hu      "Hungarian"
+    ru      "Russian"
+    jp106   "Japanese"
+    other   "(type a custom keymap name)"
+)
+KEYBOARD=$(whiptail --title "Keyboard layout" \
+    --menu "Select your keyboard layout" 22 70 14 \
+    "${KEYBOARD_LAYOUTS[@]}" 3>&1 1>&2 2>&3)
+if [[ "$KEYBOARD" == "other" ]]; then
+    KEYBOARD=$(whiptail --title "Keyboard layout" \
+        --inputbox "Keymap name (see /usr/share/kbd/keymaps/)" \
+        10 60 us 3>&1 1>&2 2>&3)
+fi
+loadkeys "$KEYBOARD" || log "loadkeys $KEYBOARD failed (continuing — installed system will still try)"
+
+# --- 3. Optional pre-seed factorio.com creds ----------------------------
 SEED_USER=""
 SEED_PASS=""
 if whiptail --title "factorio.com" \
@@ -38,11 +78,41 @@ if whiptail --title "factorio.com" \
     SEED_PASS=$(whiptail --title "factorio.com" --passwordbox "Password" 10 60 3>&1 1>&2 2>&3) || true
 fi
 
-# --- 3. Hostname / timezone --------------------------------------------
+# --- 4. Hostname / timezone --------------------------------------------
 HOSTNAME=$(whiptail --title "Hostname" --inputbox "" 10 60 "factorios" 3>&1 1>&2 2>&3)
-TIMEZONE=$(whiptail --title "Timezone" --inputbox "" 10 60 "UTC" 3>&1 1>&2 2>&3)
 
-# --- 4. Partition -------------------------------------------------------
+# Timezone: pick a region first, then a city in that region. Mirrors the
+# layout of /usr/share/zoneinfo (which tzdata ships) — we don't hardcode
+# city lists. Plus a top-level "UTC" shortcut for people who don't care.
+mapfile -t TZ_REGIONS < <(
+    find /usr/share/zoneinfo -maxdepth 1 -mindepth 1 -type d -printf '%f\n' \
+        | grep -vE '^(posix|right|SystemV)$' \
+        | sort
+)
+tz_menu=("UTC" "(no region — use UTC)")
+for r in "${TZ_REGIONS[@]}"; do
+    tz_menu+=("$r" "")
+done
+TZ_REGION=$(whiptail --title "Timezone region" \
+    --menu "Select your region" 22 60 14 \
+    "${tz_menu[@]}" 3>&1 1>&2 2>&3)
+if [[ "$TZ_REGION" == "UTC" ]]; then
+    TIMEZONE="UTC"
+else
+    mapfile -t TZ_CITIES < <(
+        find "/usr/share/zoneinfo/$TZ_REGION" -type f -printf '%P\n' | sort
+    )
+    city_menu=()
+    for c in "${TZ_CITIES[@]}"; do
+        city_menu+=("$c" "")
+    done
+    TZ_CITY=$(whiptail --title "Timezone — $TZ_REGION" \
+        --menu "Select your city" 22 70 14 \
+        "${city_menu[@]}" 3>&1 1>&2 2>&3)
+    TIMEZONE="$TZ_REGION/$TZ_CITY"
+fi
+
+# --- 5. Partition -------------------------------------------------------
 log "partitioning $DISK"
 wipefs -a "$DISK"
 parted -s "$DISK" \
@@ -69,7 +139,7 @@ mount "$ROOT" /mnt
 mkdir -p /mnt/boot
 mount "$ESP" /mnt/boot
 
-# --- 5. Pacstrap --------------------------------------------------------
+# --- 6. Pacstrap --------------------------------------------------------
 log "pacstrap"
 pacstrap -K /mnt \
     base linux linux-firmware \
@@ -81,7 +151,7 @@ pacstrap -K /mnt \
 
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# --- 6. In-chroot config ------------------------------------------------
+# --- 7. In-chroot config ------------------------------------------------
 log "configuring system"
 arch-chroot /mnt /bin/bash -e <<EOF
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
@@ -89,6 +159,7 @@ hwclock --systohc
 echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
+echo "KEYMAP=$KEYBOARD" > /etc/vconsole.conf
 echo "$HOSTNAME" > /etc/hostname
 
 # factorios user creation is declarative via factorios-base's sysusers.d
@@ -125,7 +196,7 @@ systemctl enable factorios.service
 systemctl set-default graphical.target
 EOF
 
-# --- 7. Optional credential seeding ------------------------------------
+# --- 8. Optional credential seeding ------------------------------------
 if [[ -n "$SEED_USER" && -n "$SEED_PASS" ]]; then
     log "pre-seeding factorio.com session"
     arch-chroot /mnt /bin/bash -e <<EOF
