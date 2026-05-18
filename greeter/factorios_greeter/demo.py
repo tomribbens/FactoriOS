@@ -15,6 +15,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 
 from factorios_launcher import paths, profiles, versions
 from factorios_launcher.auth import Session
+from factorios_launcher.download import ProgressStats
 
 from . import worker
 
@@ -39,6 +40,7 @@ class DemoScreen(Gtk.Box):
         self.append(self.status)
 
         self.progress = Gtk.ProgressBar()
+        self.progress.set_show_text(True)
         self.progress.set_visible(False)
         self.append(self.progress)
 
@@ -61,11 +63,19 @@ class DemoScreen(Gtk.Box):
         self.status.set_label("Downloading demo…")
         self.progress.set_visible(True)
         self.progress.set_fraction(0.0)
+        self.progress.set_text("")
         self.back_button.set_sensitive(False)
 
+        stats = ProgressStats()
+
+        def push():
+            self.progress.set_fraction(stats.fraction)
+            self.progress.set_text(stats.label())
+            return False
+
         def cb(done, total):
-            if total:
-                GLib.idle_add(self.progress.set_fraction, done / total)
+            stats.update(done, total)
+            GLib.idle_add(push)
 
         def do_download():
             versions.install_demo(Session(), progress=cb)

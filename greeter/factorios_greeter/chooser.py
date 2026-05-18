@@ -16,7 +16,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 
 from factorios_launcher import paths, profiles, versions
 from factorios_launcher.auth import Session
-from factorios_launcher.download import latest_releases
+from factorios_launcher.download import ProgressStats, latest_releases
 
 from . import worker
 
@@ -84,6 +84,7 @@ class ChooserScreen(Gtk.Box):
         self.append(self.status)
 
         self.progress = Gtk.ProgressBar()
+        self.progress.set_show_text(True)
         self.progress.set_visible(False)
         self.append(self.progress)
 
@@ -144,9 +145,16 @@ class ChooserScreen(Gtk.Box):
             # latest-releases lookup key matches the factorio.com build name.
             version = releases["stable"][paths.BUILD_API[build]]
 
+            stats = ProgressStats()
+
+            def push():
+                self.progress.set_fraction(stats.fraction)
+                self.progress.set_text(stats.label())
+                return False  # one-shot
+
             def cb(done, total):
-                if total:
-                    GLib.idle_add(self.progress.set_fraction, done / total)
+                stats.update(done, total)
+                GLib.idle_add(push)
 
             versions.install(self.session, version, build=build, progress=cb)
             return version
