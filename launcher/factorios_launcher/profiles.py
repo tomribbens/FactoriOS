@@ -65,8 +65,28 @@ def launch(
     ensure(username, profile, build=build)
     binary = paths.factorio_binary(version_id)
     profile_path = paths.profile_dir(username, profile, build=build)
-    env = os.environ.copy()
     return subprocess.Popen(
         [str(binary), "--write-data", str(profile_path)],
-        env=env,
+        env=_factorio_env(),
     )
+
+
+# Env vars the greeter session needs (to survive on VirtualBox vmwgfx) but
+# Factorio must NOT inherit — software GL via llvmpipe makes Factorio fail
+# during renderer init, and the WLR_* hints are for wlroots only.
+_GREETER_ONLY_ENV = (
+    "LIBGL_ALWAYS_SOFTWARE",
+    "WLR_RENDERER",
+    "WLR_NO_HARDWARE_CURSORS",
+    "WLR_DRM_NO_ATOMIC",
+    "WLR_LIBINPUT_NO_DEVICES",
+)
+
+
+def _factorio_env() -> dict[str, str]:
+    """Inherit the greeter's env but strip the keys that would force
+    Factorio onto software rendering or otherwise confuse its renderer."""
+    env = os.environ.copy()
+    for k in _GREETER_ONLY_ENV:
+        env.pop(k, None)
+    return env
