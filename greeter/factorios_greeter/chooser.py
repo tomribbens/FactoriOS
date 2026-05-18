@@ -18,7 +18,7 @@ from factorios_launcher import paths, profiles, versions
 from factorios_launcher.auth import Session
 from factorios_launcher.download import ProgressStats, is_newer, latest_releases
 
-from . import worker
+from . import power, worker
 
 
 class ChooserScreen(Gtk.Box):
@@ -113,6 +113,18 @@ class ChooserScreen(Gtk.Box):
         self.launch_button.connect("clicked", self._on_launch)
         actions.append(self.launch_button)
         self.append(actions)
+
+        # --- Footer: forget-me + power controls --------------------------
+        footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        forget = Gtk.Button(label="Forget me")
+        forget.add_css_class("flat")
+        forget.set_tooltip_text("Delete the cached factorio.com session and return to sign-in")
+        forget.connect("clicked", self._on_forget_me)
+        footer.append(forget)
+        spacer = Gtk.Box(hexpand=True)
+        footer.append(spacer)
+        footer.append(power.make_row())
+        self.append(footer)
 
         self._refresh_versions()
         self._refresh_profiles()
@@ -303,6 +315,56 @@ class ChooserScreen(Gtk.Box):
 
         install.connect("clicked", on_install)
         version_entry.connect("activate", on_install)
+        dialog.set_child(box)
+        dialog.present()
+
+    def _on_forget_me(self, *_args) -> None:
+        """Delete the cached session and last-user pointer for this user,
+        then drop back to the sign-in screen."""
+        dialog = Gtk.Window(
+            title="Forget me", transient_for=self.get_root(), modal=True,
+        )
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=12,
+            margin_top=16, margin_bottom=16, margin_start=16, margin_end=16,
+        )
+        box.append(Gtk.Label(
+            label=(
+                f"Forget {self.session.username}?\n\n"
+                "The cached factorio.com session is deleted and Remember "
+                "Me is cleared. Your installed versions, profiles, and "
+                "saves are kept."
+            ),
+            wrap=True,
+            xalign=0,
+        ))
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.set_halign(Gtk.Align.END)
+        cancel = Gtk.Button(label="Cancel")
+        cancel.connect("clicked", lambda *_: dialog.close())
+        actions.append(cancel)
+        confirm = Gtk.Button(label="Forget me")
+        confirm.add_css_class("destructive-action")
+
+        def go(*_):
+            dialog.close()
+            sess_path = paths.user_session(self.session.username)
+            if sess_path.exists():
+                try:
+                    sess_path.unlink()
+                except OSError:
+                    pass
+            if paths.LAST_USER.exists():
+                try:
+                    if paths.LAST_USER.read_text().strip() == self.session.username:
+                        paths.LAST_USER.unlink()
+                except OSError:
+                    pass
+            self._on_switch_user()
+
+        confirm.connect("clicked", go)
+        actions.append(confirm)
+        box.append(actions)
         dialog.set_child(box)
         dialog.present()
 

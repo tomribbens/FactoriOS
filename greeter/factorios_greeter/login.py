@@ -11,7 +11,7 @@ from gi.repository import Gtk  # noqa: E402
 
 from factorios_launcher.auth import AuthError, Session
 
-from . import worker
+from . import power, worker
 
 
 class LoginScreen(Gtk.Box):
@@ -68,6 +68,10 @@ class LoginScreen(Gtk.Box):
         # Submit on Enter from either entry.
         self.user_entry.connect("activate", lambda *_: self.pass_entry.grab_focus())
         self.pass_entry.connect("activate", self._on_clicked)
+
+        # Power controls — appliance behaviour: you can shut the box
+        # down without logging in.
+        self.append(power.make_row())
 
     def _set_busy(self, busy: bool) -> None:
         self.button.set_sensitive(not busy)
