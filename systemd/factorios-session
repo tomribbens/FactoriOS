@@ -14,7 +14,10 @@
 # latest session.
 set -euo pipefail
 
-LOG=/var/lib/factorios/session.log
+# /tmp is always writable; /var/lib/factorios needs the tmpfiles.d entry to
+# guarantee factorios ownership, and we don't want a chicken-and-egg
+# situation where the log can't be written because the perms aren't fixed.
+LOG=/tmp/factorios-session.log
 exec >"$LOG" 2>&1
 
 echo "=== $(date -Iseconds) FactoriOS session start (pid=$$) ==="
