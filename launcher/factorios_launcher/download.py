@@ -90,6 +90,20 @@ def latest_releases(session: Session) -> dict:
     return r.json()
 
 
+def parse_version(v: str) -> tuple[int, ...]:
+    """Tuple-of-ints for cheap ordering. Returns () for malformed input
+    so comparisons fall back to "older than anything"."""
+    try:
+        return tuple(int(x) for x in v.split("."))
+    except (ValueError, AttributeError):
+        return ()
+
+
+def is_newer(a: str, b: str) -> bool:
+    """True if version `a` is strictly newer than version `b`."""
+    return parse_version(a) > parse_version(b)
+
+
 def download(
     session: Session,
     dest: Path,

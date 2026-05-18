@@ -16,7 +16,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 
 from factorios_launcher import paths, profiles, versions
 from factorios_launcher.auth import Session
-from factorios_launcher.download import ProgressStats, latest_releases
+from factorios_launcher.download import ProgressStats, is_newer, latest_releases
 
 from . import worker
 
@@ -62,8 +62,8 @@ class ChooserScreen(Gtk.Box):
         self.version_combo = Gtk.DropDown.new_from_strings([])
         self.version_combo.set_hexpand(True)
         version_row.append(self.version_combo)
-        self.install_button = Gtk.Button(label="Install latest")
-        self.install_button.connect("clicked", self._on_install_latest)
+        self.install_button = Gtk.Button(label="Install…")
+        self.install_button.connect("clicked", self._on_install_clicked)
         version_row.append(self.install_button)
         self.append(version_row)
 
@@ -132,34 +132,131 @@ class ChooserScreen(Gtk.Box):
 
     # --- actions ---------------------------------------------------------
 
-    def _on_install_latest(self, *_args) -> None:
+    def _on_install_clicked(self, *_args) -> None:
+        """Look up available releases, then show a dialog letting the
+        user pick latest stable, latest experimental (if newer), or any
+        specific version."""
         build = self._build
         build_label = paths.BUILD_DISPLAY[build]
         self.install_button.set_sensitive(False)
-        self.status.set_label(f"Looking up latest {build_label} release…")
+        self.status.set_label(f"Looking up {build_label} releases…")
+
+        def fetch():
+            releases = latest_releases(self.session)
+            api = paths.BUILD_API[build]
+            stable = releases.get("stable", {}).get(api)
+            experimental = releases.get("experimental", {}).get(api)
+            return stable, experimental
+
+        def show(result):
+            stable, experimental = result
+            self.install_button.set_sensitive(True)
+            self.status.set_label("")
+            self._show_install_dialog(stable, experimental)
+
+        def failed(exc):
+            self.install_button.set_sensitive(True)
+            self.status.set_label(f"Lookup failed: {exc}")
+
+        worker.run(fetch, on_done=show, on_error=failed)
+
+    def _show_install_dialog(self, stable: str | None, experimental: str | None) -> None:
+        dialog = Gtk.Window(
+            title=f"Install {paths.BUILD_DISPLAY[self._build]}",
+            transient_for=self.get_root(),
+            modal=True,
+        )
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=8,
+            margin_top=16, margin_bottom=16, margin_start=16, margin_end=16,
+        )
+
+        stable_btn: Gtk.CheckButton | None = None
+        exp_btn: Gtk.CheckButton | None = None
+
+        if stable:
+            stable_btn = Gtk.CheckButton.new_with_label(f"Latest stable ({stable})")
+            stable_btn.set_active(True)
+            box.append(stable_btn)
+
+        # Only show experimental if it's actually newer than stable —
+        # otherwise it's the same thing under another name.
+        if experimental and (not stable or is_newer(experimental, stable)):
+            exp_btn = Gtk.CheckButton.new_with_label(f"Latest experimental ({experimental})")
+            if stable_btn is not None:
+                exp_btn.set_group(stable_btn)
+            else:
+                exp_btn.set_active(True)
+            box.append(exp_btn)
+
+        custom_btn = Gtk.CheckButton.new_with_label("Specific version:")
+        if stable_btn is not None:
+            custom_btn.set_group(stable_btn)
+        elif exp_btn is not None:
+            custom_btn.set_group(exp_btn)
+        else:
+            custom_btn.set_active(True)
+        box.append(custom_btn)
+
+        version_entry = Gtk.Entry(placeholder_text="e.g. 1.1.110")
+        version_entry.set_margin_start(24)
+        # Auto-select the radio when the user types into the entry.
+        version_entry.connect("changed", lambda *_: custom_btn.set_active(True))
+        box.append(version_entry)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.set_halign(Gtk.Align.END)
+        actions.set_margin_top(8)
+        cancel = Gtk.Button(label="Cancel")
+        cancel.connect("clicked", lambda *_: dialog.close())
+        actions.append(cancel)
+        install = Gtk.Button(label="Install")
+        install.add_css_class("suggested-action")
+        actions.append(install)
+        box.append(actions)
+
+        def on_install(*_):
+            if stable_btn is not None and stable_btn.get_active():
+                version = stable
+            elif exp_btn is not None and exp_btn.get_active():
+                version = experimental
+            else:
+                version = version_entry.get_text().strip()
+            if not version:
+                return
+            dialog.close()
+            self._do_install(version)
+
+        install.connect("clicked", on_install)
+        version_entry.connect("activate", on_install)
+        dialog.set_child(box)
+        dialog.present()
+
+    def _do_install(self, version: str) -> None:
+        build = self._build
+        build_label = paths.BUILD_DISPLAY[build]
+        self.install_button.set_sensitive(False)
+        self.status.set_label(f"Installing {build_label} {version}…")
         self.progress.set_visible(True)
         self.progress.set_fraction(0.0)
+        self.progress.set_text("")
+
+        stats = ProgressStats()
+
+        def push():
+            self.progress.set_fraction(stats.fraction)
+            self.progress.set_text(stats.label())
+            return False
+
+        def cb(done, total):
+            stats.update(done, total)
+            GLib.idle_add(push)
 
         def do_install():
-            releases = latest_releases(self.session)
-            # latest-releases lookup key matches the factorio.com build name.
-            version = releases["stable"][paths.BUILD_API[build]]
-
-            stats = ProgressStats()
-
-            def push():
-                self.progress.set_fraction(stats.fraction)
-                self.progress.set_text(stats.label())
-                return False  # one-shot
-
-            def cb(done, total):
-                stats.update(done, total)
-                GLib.idle_add(push)
-
             versions.install(self.session, version, build=build, progress=cb)
             return version
 
-        def done(version):
+        def done(_version):
             self.install_button.set_sensitive(True)
             self.progress.set_visible(False)
             self.status.set_label(f"Installed {build_label} {version}.")
