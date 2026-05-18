@@ -65,6 +65,9 @@ class ChooserScreen(Gtk.Box):
         self.install_button = Gtk.Button(label="Install…")
         self.install_button.connect("clicked", self._on_install_clicked)
         version_row.append(self.install_button)
+        self.delete_version_button = Gtk.Button(label="Delete")
+        self.delete_version_button.connect("clicked", self._on_delete_version)
+        version_row.append(self.delete_version_button)
         self.append(version_row)
 
         # --- Profile row -------------------------------------------------
@@ -117,6 +120,7 @@ class ChooserScreen(Gtk.Box):
         model = Gtk.StringList.new(installed or ["(none installed)"])
         self.version_combo.set_model(model)
         self.launch_button.set_sensitive(bool(installed))
+        self.delete_version_button.set_sensitive(bool(installed))
 
     def _refresh_profiles(self) -> None:
         profs = profiles.list_profiles(self.session.username, build=self._build) or [profiles.DEFAULT_PROFILE]
@@ -229,6 +233,50 @@ class ChooserScreen(Gtk.Box):
 
         install.connect("clicked", on_install)
         version_entry.connect("activate", on_install)
+        dialog.set_child(box)
+        dialog.present()
+
+    def _on_delete_version(self, *_args) -> None:
+        version = self._selected(self.version_combo)
+        if not version or version == "(none installed)":
+            return
+        build = self._build
+        build_label = paths.BUILD_DISPLAY[build]
+
+        dialog = Gtk.Window(
+            title="Delete version",
+            transient_for=self.get_root(),
+            modal=True,
+        )
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=12,
+            margin_top=16, margin_bottom=16, margin_start=16, margin_end=16,
+        )
+        msg = Gtk.Label(label=f"Remove {build_label} {version}?\n\nSaves and mods are kept; only the game files are deleted.")
+        msg.set_wrap(True)
+        msg.set_xalign(0)
+        box.append(msg)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.set_halign(Gtk.Align.END)
+        cancel = Gtk.Button(label="Cancel")
+        cancel.connect("clicked", lambda *_: dialog.close())
+        actions.append(cancel)
+        confirm = Gtk.Button(label="Delete")
+        confirm.add_css_class("destructive-action")
+
+        def on_confirm(*_):
+            dialog.close()
+            try:
+                versions.remove(version, build)
+                self.status.set_label(f"Removed {build_label} {version}.")
+            except OSError as e:
+                self.status.set_label(f"Delete failed: {e}")
+            self._refresh_versions()
+
+        confirm.connect("clicked", on_confirm)
+        actions.append(confirm)
+        box.append(actions)
         dialog.set_child(box)
         dialog.present()
 
