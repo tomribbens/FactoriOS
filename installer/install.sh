@@ -29,43 +29,77 @@ whiptail --title "Confirm" --yesno \
     || die "aborted"
 
 # --- 2. Keyboard layout -------------------------------------------------
-# Ask before any text input so the user types subsequent answers using
-# their real layout. The same value also goes into /mnt/etc/vconsole.conf
-# so the installed system boots with the right console keymap.
+# Two layers to set: the kbd console keymap (loadkeys / /etc/vconsole.conf)
+# and the XKB layout libxkbcommon uses for Wayland/X11
+# (/etc/X11/xorg.conf.d/00-keyboard.conf). The menu is keyed by XKB layout
+# (the more expressive namespace); the console keymap is derived via the
+# XKB_TO_KEYMAP table below.
 KEYBOARD_LAYOUTS=(
-    us      "US English (QWERTY)"
-    us-acentos "US English (international)"
-    gb      "British English"
-    ie      "Irish"
-    de-latin1 "German"
-    fr-latin1 "French (AZERTY)"
-    be-latin1 "Belgian (AZERTY)"
-    es      "Spanish"
-    it      "Italian"
-    pt-latin1 "Portuguese"
-    br-abnt2 "Brazilian (ABNT2)"
-    nl      "Dutch"
-    no-latin1 "Norwegian"
-    sv-latin1 "Swedish"
-    dk-latin1 "Danish"
-    fi-latin1 "Finnish"
-    de_CH-latin1 "Swiss German"
-    fr_CH-latin1 "Swiss French"
-    pl      "Polish"
-    cz-lat2 "Czech"
-    hu      "Hungarian"
-    ru      "Russian"
-    jp106   "Japanese"
-    other   "(type a custom keymap name)"
+    us  "US English (QWERTY)"
+    gb  "British English"
+    ie  "Irish"
+    de  "German"
+    fr  "French (AZERTY)"
+    be  "Belgian (AZERTY)"
+    es  "Spanish"
+    it  "Italian"
+    pt  "Portuguese"
+    br  "Brazilian"
+    nl  "Dutch"
+    no  "Norwegian"
+    se  "Swedish"
+    dk  "Danish"
+    fi  "Finnish"
+    ch  "Swiss German"
+    "ch(fr)" "Swiss French"
+    pl  "Polish"
+    cz  "Czech"
+    hu  "Hungarian"
+    ru  "Russian"
+    jp  "Japanese"
+    other "(type a custom layout name)"
 )
-KEYBOARD=$(whiptail --title "Keyboard layout" \
+declare -A XKB_TO_KEYMAP=(
+    [us]=us
+    [gb]=uk
+    [ie]=ie
+    [de]=de-latin1
+    [fr]=fr-latin1
+    [be]=be-latin1
+    [es]=es
+    [it]=it
+    [pt]=pt-latin1
+    [br]=br-abnt2
+    [nl]=nl
+    [no]=no-latin1
+    [se]=sv-latin1
+    [dk]=dk-latin1
+    [fi]=fi-latin1
+    [ch]=de_CH-latin1
+    ["ch(fr)"]=fr_CH-latin1
+    [pl]=pl
+    [cz]=cz-lat2
+    [hu]=hu
+    [ru]=ru
+    [jp]=jp106
+)
+XKB_LAYOUT=$(whiptail --title "Keyboard layout" \
     --menu "Select your keyboard layout" 22 70 14 \
     "${KEYBOARD_LAYOUTS[@]}" 3>&1 1>&2 2>&3)
-if [[ "$KEYBOARD" == "other" ]]; then
-    KEYBOARD=$(whiptail --title "Keyboard layout" \
-        --inputbox "Keymap name (see /usr/share/kbd/keymaps/)" \
+if [[ "$XKB_LAYOUT" == "other" ]]; then
+    XKB_LAYOUT=$(whiptail --title "Keyboard layout" \
+        --inputbox "XKB layout name (e.g. us, gb, de, dvorak)" \
         10 60 us 3>&1 1>&2 2>&3)
 fi
+# Strip an optional XKB variant in parens — we currently only special-case
+# Swiss French ("ch(fr)") and don't expose other variants.
+XKB_VARIANT=""
+if [[ "$XKB_LAYOUT" == *"("*")"* ]]; then
+    XKB_VARIANT="${XKB_LAYOUT##*\(}"
+    XKB_VARIANT="${XKB_VARIANT%\)}"
+    XKB_LAYOUT="${XKB_LAYOUT%%\(*}"
+fi
+KEYBOARD="${XKB_TO_KEYMAP[${XKB_LAYOUT}${XKB_VARIANT:+(${XKB_VARIANT})}]:-${XKB_TO_KEYMAP[$XKB_LAYOUT]:-$XKB_LAYOUT}}"
 loadkeys "$KEYBOARD" || log "loadkeys $KEYBOARD failed (continuing — installed system will still try)"
 
 # --- 3. Optional pre-seed factorio.com creds ----------------------------
@@ -160,6 +194,17 @@ echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "KEYMAP=$KEYBOARD" > /etc/vconsole.conf
+# XKB layout for Wayland/X11 (labwc + the greeter read this via
+# libxkbcommon). vconsole.conf alone doesn't carry into Wayland.
+mkdir -p /etc/X11/xorg.conf.d
+cat > /etc/X11/xorg.conf.d/00-keyboard.conf <<KB
+Section "InputClass"
+    Identifier "system-keyboard"
+    MatchIsKeyboard "on"
+    Option "XkbLayout" "$XKB_LAYOUT"
+$( [[ -n "$XKB_VARIANT" ]] && echo "    Option \"XkbVariant\" \"$XKB_VARIANT\"" )
+EndSection
+KB
 echo "$HOSTNAME" > /etc/hostname
 
 # factorios user creation is declarative via factorios-base's sysusers.d
