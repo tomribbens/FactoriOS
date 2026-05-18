@@ -9,6 +9,7 @@ The guest/demo flow is flat (no build dimension):
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -66,10 +67,9 @@ def launch(
     not exist`). Saves and config live at the default location
     (~/.factorio/{saves,config}) and are shared across profiles.
 
-    If `session` has cached factorio.com credentials we forward them via
-    --service-username/--service-token so the in-game mod portal works
-    without a second login. Visible to `ps` on the local box; on a
-    single-user appliance that's an acceptable tradeoff for the UX win.
+    If `session` has cached factorio.com credentials we seed them into
+    ~/.factorio/player-data.json so the in-game mod portal works without
+    a second login. (These aren't CLI flags — only fields in the JSON.)
     """
     ensure(username, profile, build=build)
     # If Factorio's in-game updater bumped the install since we last
@@ -78,15 +78,34 @@ def launch(
     # --version` output and returns the (possibly new) id.
     if build is not None:
         version_id = versions.reconcile(version_id, build)
+    if session:
+        _seed_service_credentials(session)
     binary = paths.factorio_binary(version_id)
     mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
-    args = [str(binary), "--mod-directory", str(mod_dir)]
-    if session and session.username and session.token:
-        args += [
-            "--service-username", session.username,
-            "--service-token", session.token,
-        ]
-    return subprocess.Popen(args, env=_factorio_env())
+    return subprocess.Popen(
+        [str(binary), "--mod-directory", str(mod_dir)],
+        env=_factorio_env(),
+    )
+
+
+def _seed_service_credentials(session: Session) -> None:
+    """Write service-username + service-token into ~/.factorio/player-data.json
+    so the in-game mod portal skips its own login. Preserves any other
+    fields already in the file (Factorio writes lots of state in there)."""
+    if not (session.username and session.token):
+        return
+    fac_dir = Path.home() / ".factorio"
+    fac_dir.mkdir(parents=True, exist_ok=True)
+    pd = fac_dir / "player-data.json"
+    data: dict = {}
+    if pd.exists():
+        try:
+            data = json.loads(pd.read_text())
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    data["service-username"] = session.username
+    data["service-token"] = session.token
+    pd.write_text(json.dumps(data, indent=2))
 
 
 # Env vars the greeter session needs (to survive on VirtualBox vmwgfx) but
