@@ -17,10 +17,13 @@ buildmodes=('iso')
 bootmodes=('bios.syslinux' 'uefi.grub')
 arch="x86_64"
 pacman_conf="pacman.conf"
-# erofs with lzma compresses archiso-style content noticeably better than
-# squashfs+xz at the same level. Same payload, smaller output.
-airootfs_image_type="erofs"
-airootfs_image_tool_options=('-zlzma,109' -E 'ztailpacking')
+# Squashfs+xz: previous attempt at erofs+lzma produced an unbootable ISO
+# (initrd couldn't mount the airootfs — likely missing erofs kernel
+# module in the initrd despite mkinitcpio-archiso). Squashfs is safe and
+# the trims we already did (no linux-firmware/dhcpcd/openssh/htop) are
+# where the real size win came from anyway.
+airootfs_image_type="squashfs"
+airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
 file_permissions=(
     ["/etc/shadow"]="0:0:400"
     ["/root"]="0:0:750"
