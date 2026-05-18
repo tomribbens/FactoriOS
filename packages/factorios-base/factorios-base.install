@@ -1,9 +1,16 @@
 post_install() {
-    # Single shared system user; identity is factorio.com, not Unix.
+    # Single shared appliance user; identity is factorio.com, not Unix.
+    # NOT a system user — we want UID 1000 so it matches the hardcoded
+    # XDG_RUNTIME_DIR=/run/user/1000 in factorios.service. `useradd --system
+    # --uid 1000` silently picks a UID in the system range (200-999) and
+    # ignores the --uid, which causes a runtime-dir mismatch (PAM session
+    # creates /run/user/<real-uid> while Wayland socket lives in
+    # /run/user/1000 → labwc and the greeter never agree on a directory).
+    # Needs `render` for /dev/dri/renderD128 on top of video for card0.
     if ! id factorios &>/dev/null; then
-        useradd --system --create-home --uid 1000 \
+        useradd --create-home --uid 1000 \
             --shell /usr/bin/nologin \
-            --groups seat,video,input \
+            --groups seat,video,input,render \
             factorios
     fi
 
