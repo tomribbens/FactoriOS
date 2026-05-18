@@ -29,7 +29,12 @@ def download(
     progress: ProgressCb | None = None,
 ) -> Path:
     url = GET_DOWNLOAD.format(version=version, build=build, distro=distro)
-    with session.http.get(url, stream=True, timeout=60) as r:
+    # Authenticated builds (alpha, expansion) need ?username=&token=.
+    # The public demo build accepts requests with no params.
+    params: dict[str, str] = {}
+    if session.username and session.token:
+        params = {"username": session.username, "token": session.token}
+    with session.http.get(url, params=params, stream=True, timeout=60) as r:
         r.raise_for_status()
         total = int(r.headers.get("content-length", 0))
         done = 0
