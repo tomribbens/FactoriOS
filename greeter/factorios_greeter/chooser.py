@@ -79,6 +79,9 @@ class ChooserScreen(Gtk.Box):
         self.new_profile_button = Gtk.Button(label="New profile…")
         self.new_profile_button.connect("clicked", self._on_new_profile)
         profile_row.append(self.new_profile_button)
+        self.delete_profile_button = Gtk.Button(label="Delete")
+        self.delete_profile_button.connect("clicked", self._on_delete_profile)
+        profile_row.append(self.delete_profile_button)
         self.append(profile_row)
 
         # --- Status + progress ------------------------------------------
@@ -123,8 +126,12 @@ class ChooserScreen(Gtk.Box):
         self.delete_version_button.set_sensitive(bool(installed))
 
     def _refresh_profiles(self) -> None:
-        profs = profiles.list_profiles(self.session.username, build=self._build) or [profiles.DEFAULT_PROFILE]
+        on_disk = profiles.list_profiles(self.session.username, build=self._build)
+        profs = on_disk or [profiles.DEFAULT_PROFILE]
         self.profile_combo.set_model(Gtk.StringList.new(profs))
+        # Only allow delete when a profile actually exists on disk —
+        # the DEFAULT_PROFILE fallback in the dropdown is a placeholder.
+        self.delete_profile_button.set_sensitive(bool(on_disk))
 
     def _selected(self, combo: Gtk.DropDown) -> str | None:
         model = combo.get_model()
@@ -233,6 +240,54 @@ class ChooserScreen(Gtk.Box):
 
         install.connect("clicked", on_install)
         version_entry.connect("activate", on_install)
+        dialog.set_child(box)
+        dialog.present()
+
+    def _on_delete_profile(self, *_args) -> None:
+        profile = self._selected(self.profile_combo)
+        if not profile:
+            return
+        build = self._build
+        build_label = paths.BUILD_DISPLAY[build]
+
+        dialog = Gtk.Window(
+            title="Delete profile",
+            transient_for=self.get_root(),
+            modal=True,
+        )
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=12,
+            margin_top=16, margin_bottom=16, margin_start=16, margin_end=16,
+        )
+        msg = Gtk.Label(
+            label=f"Delete the “{profile}” {build_label} profile?\n\n"
+                  "This removes the profile's mods directory. Saves and "
+                  "config live at ~/.factorio and are not affected."
+        )
+        msg.set_wrap(True)
+        msg.set_xalign(0)
+        box.append(msg)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.set_halign(Gtk.Align.END)
+        cancel = Gtk.Button(label="Cancel")
+        cancel.connect("clicked", lambda *_: dialog.close())
+        actions.append(cancel)
+        confirm = Gtk.Button(label="Delete")
+        confirm.add_css_class("destructive-action")
+
+        def on_confirm(*_):
+            dialog.close()
+            try:
+                profiles.remove(self.session.username, profile, build=build)
+                self.status.set_label(f"Deleted profile “{profile}”.")
+            except OSError as e:
+                self.status.set_label(f"Delete failed: {e}")
+            self._refresh_profiles()
+
+        confirm.connect("clicked", on_confirm)
+        actions.append(confirm)
+        box.append(actions)
         dialog.set_child(box)
         dialog.present()
 
