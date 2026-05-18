@@ -21,4 +21,4 @@ iso/airootfs/var/cache/factorios-repo/
 
 # Per-user Claude Code settings
 .claude/settings.local.json
-error.png
+error*.png
