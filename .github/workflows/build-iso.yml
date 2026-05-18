@@ -9,7 +9,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # needed to attach ISOs to a release on tag pushes
+  contents: write   # attach ISOs to a release on tag pushes
+  pages: write      # publish the [factorios] pacman repo to GitHub Pages
+  id-token: write   # actions/deploy-pages OIDC
+
+# Don't run two Pages deploys concurrently — github-pages env enforces it
+# anyway, but this skips the queueing.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -86,3 +94,48 @@ jobs:
             iso/out/factorios-2*.iso
             iso/out/factorios-full-*.iso
           generate_release_notes: true
+
+      # --- Publish the [factorios] pacman repo to GitHub Pages -------------
+      # Served at https://tomribbens.github.io/FactoriOS/x86_64/. The
+      # installer wires this as a [factorios] entry in /etc/pacman.conf so
+      # `pacman -Syu` on an installed system picks up new package versions
+      # alongside the rest of Arch. main pushes only — PRs and tags don't
+      # republish.
+      - name: Stage repo for GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          # mkarchiso ran as root inside the container; ownership of the
+          # staged repo may be off for the runner user.
+          sudo chown -R "$USER":"$USER" iso/airootfs/var/cache/factorios-repo
+          mkdir -p gh-pages-stage/x86_64
+          cp iso/airootfs/var/cache/factorios-repo/* gh-pages-stage/x86_64/
+          # Convenience landing page so a browser visit isn't a 404.
+          cat > gh-pages-stage/index.html <<'EOF'
+          <!doctype html><meta charset=utf-8><title>FactoriOS pacman repo</title>
+          <h1>FactoriOS</h1>
+          <p>This is the pacman repo for <a href="https://github.com/tomribbens/FactoriOS">FactoriOS</a>.</p>
+          <p>Add to <code>/etc/pacman.conf</code>:</p>
+          <pre>[factorios]
+          SigLevel = Optional TrustAll
+          Server = https://tomribbens.github.io/FactoriOS/$arch
+          </pre>
+          EOF
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gh-pages-stage
+
+  pages:
+    # GitHub Pages requires a dedicated job + environment.
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

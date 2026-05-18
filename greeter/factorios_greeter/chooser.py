@@ -18,7 +18,7 @@ from factorios_launcher import paths, profiles, versions
 from factorios_launcher.auth import Session
 from factorios_launcher.download import ProgressStats, is_newer, latest_releases
 
-from . import power, worker
+from . import power, updates, worker
 
 
 class ChooserScreen(Gtk.Box):
@@ -114,13 +114,18 @@ class ChooserScreen(Gtk.Box):
         actions.append(self.launch_button)
         self.append(actions)
 
-        # --- Footer: forget-me + power controls --------------------------
+        # --- Footer: forget-me + updates + power controls ----------------
         footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         forget = Gtk.Button(label="Forget me")
         forget.add_css_class("flat")
         forget.set_tooltip_text("Delete the cached factorio.com session and return to sign-in")
         forget.connect("clicked", self._on_forget_me)
         footer.append(forget)
+        updates_btn = Gtk.Button(label="Updates…")
+        updates_btn.add_css_class("flat")
+        updates_btn.set_tooltip_text("Check for and install Arch + FactoriOS package updates")
+        updates_btn.connect("clicked", lambda *_: updates.show_dialog(self))
+        footer.append(updates_btn)
         spacer = Gtk.Box(hexpand=True)
         footer.append(spacer)
         footer.append(power.make_row())

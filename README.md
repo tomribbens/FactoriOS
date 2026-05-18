@@ -36,7 +36,13 @@ systemd/     factorios.service + supporting config
 
 Both write to `iso/out/`. Requires `archiso`, `pacman`, `base-devel`, `erofs-utils` on the build host. Run as a regular user with sudo access — `makepkg` runs as you, `mkarchiso` runs under sudo from inside the scripts.
 
-CI also builds the ISO(s): see `.github/workflows/build-iso.yml`. Every push to `main` produces a slim ISO as a downloadable artifact. Tag pushes (`v*`) additionally build the full ISO and attach **both** to the GitHub Release.
+CI also builds the ISO(s): see `.github/workflows/build-iso.yml`. Every push to `main` produces a slim ISO as a downloadable artifact and publishes the `[factorios]` pacman repo to GitHub Pages. Tag pushes (`v*`) additionally build the full ISO and attach **both** to the GitHub Release.
+
+## Updates
+
+Installed FactoriOS systems can `pacman -Syu` to upgrade Arch + our packages together. The `[factorios]` repo at <https://tomribbens.github.io/FactoriOS/x86_64/> is wired into `/etc/pacman.conf` by the installer; the greeter has an *Updates…* button (footer of the chooser) that calls `pacman -Sy` + lists upgrades + runs `pacman --noconfirm -Syu`, all via a narrow `sudoers.d` rule that allows the kiosk user *only* those two exact invocations.
+
+**One-time setup** (repo owner only): the first CI run after enabling Pages distribution needs `Settings → Pages → Source: GitHub Actions` ticked. Without it the `pages` job fails — fix is the same one click.
 
 ## Identity model
 

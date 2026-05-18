@@ -22,10 +22,11 @@ source=()
 install=factorios-base.install
 
 prepare() {
-    cp "$startdir/../../systemd/factorios.service"       "$srcdir/factorios.service"
-    cp "$startdir/../../systemd/factorios-session"       "$srcdir/factorios-session"
-    cp "$startdir/../../systemd/factorios-tmpfiles.conf" "$srcdir/factorios-tmpfiles.conf"
-    cp "$startdir/../../systemd/factorios-sysusers.conf" "$srcdir/factorios-sysusers.conf"
+    cp "$startdir/../../systemd/factorios.service"          "$srcdir/factorios.service"
+    cp "$startdir/../../systemd/factorios-session"          "$srcdir/factorios-session"
+    cp "$startdir/../../systemd/factorios-tmpfiles.conf"    "$srcdir/factorios-tmpfiles.conf"
+    cp "$startdir/../../systemd/factorios-sysusers.conf"    "$srcdir/factorios-sysusers.conf"
+    cp "$startdir/../../systemd/factorios-pacman.sudoers"   "$srcdir/factorios-pacman.sudoers"
 }
 
 package() {
@@ -37,4 +38,7 @@ package() {
         "$pkgdir/usr/lib/tmpfiles.d/factorios.conf"
     install -Dm644 "$srcdir/factorios-sysusers.conf" \
         "$pkgdir/usr/lib/sysusers.d/factorios.conf"
+    # sudoers files must be mode 440 — sudo refuses to read otherwise.
+    install -Dm440 "$srcdir/factorios-pacman.sudoers" \
+        "$pkgdir/etc/sudoers.d/factorios-pacman"
 }

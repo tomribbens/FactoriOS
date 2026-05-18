@@ -249,6 +249,16 @@ systemctl enable NetworkManager.service
 systemctl enable seatd.service
 systemctl enable factorios.service
 systemctl set-default graphical.target
+
+# Add the [factorios] repo so pacman -Syu can pull updates to our own
+# packages alongside everything else. CI publishes to GitHub Pages on
+# every push to main.
+cat >> /etc/pacman.conf <<PACMAN
+
+[factorios]
+SigLevel = Optional TrustAll
+Server = https://tomribbens.github.io/FactoriOS/\$arch
+PACMAN
 EOF
 
 # --- 8. Optional credential seeding ------------------------------------

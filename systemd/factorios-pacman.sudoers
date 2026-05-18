@@ -1,0 +1,6 @@
+# Allow the factorios kiosk user to refresh pacman databases and run a
+# full system upgrade without a password. No wildcards — only these two
+# exact invocations are permitted, so the blast radius is bounded even
+# though pacman itself runs as root.
+factorios ALL=(root) NOPASSWD: /usr/bin/pacman -Sy
+factorios ALL=(root) NOPASSWD: /usr/bin/pacman --noconfirm -Syu
