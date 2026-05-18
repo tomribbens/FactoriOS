@@ -24,6 +24,13 @@ Environment=WLR_LIBINPUT_NO_DEVICES=1
 # keeps the compositor alive on VirtualBox.
 Environment=WLR_NO_HARDWARE_CURSORS=1
 Environment=WLR_DRM_NO_ATOMIC=1
+# Force software rendering for the compositor + GTK greeter. Bypasses
+# the linux-dmabuf path which VirtualBox's vmwgfx fails on ("Failed to
+# choose buffer bundle for plane 0"). The greeter is light enough that
+# llvmpipe is fine. Factorio itself will want hardware GL — when we
+# get there, we'll likely scope these envs to the greeter session only.
+Environment=WLR_RENDERER=pixman
+Environment=LIBGL_ALWAYS_SOFTWARE=1
 # labwc -s CMD runs CMD on startup. The greeter is the entire session.
 ExecStartPre=/usr/bin/install -d -o factorios -g factorios -m 700 /run/user/1000
 # Routed through a wrapper that captures the whole session transcript to
