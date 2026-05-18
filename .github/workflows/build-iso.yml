@@ -105,9 +105,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
-          # mkarchiso ran as root inside the container; ownership of the
-          # staged repo may be off for the runner user.
-          sudo chown -R "$USER":"$USER" iso/airootfs/var/cache/factorios-repo
+          # The docker container chown'd the whole workspace to its
+          # internal builder UID; reclaim it for the runner before we
+          # try to mkdir anywhere.
+          sudo chown -R "$USER":"$USER" .
           mkdir -p gh-pages-stage/x86_64
           cp iso/airootfs/var/cache/factorios-repo/* gh-pages-stage/x86_64/
           # Convenience landing page so a browser visit isn't a 404.
