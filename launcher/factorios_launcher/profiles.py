@@ -72,6 +72,10 @@ def launch(
     a second login. (These aren't CLI flags — only fields in the JSON.)
     """
     ensure(username, profile, build=build)
+    # Point ~/.factorio at the per-user data dir so each factorio.com
+    # account gets its own saves/config/player-data — the appliance runs
+    # as a single Unix user, so without this everything would be shared.
+    _link_home_factorio(username)
     # If Factorio's in-game updater bumped the install since we last
     # touched it, the on-disk directory name is stale. Reconcile before
     # exec — versions.reconcile renames the dir to match `factorio
@@ -86,6 +90,43 @@ def launch(
         [str(binary), "--mod-directory", str(mod_dir)],
         env=_factorio_env(),
     )
+
+
+def _link_home_factorio(username: str) -> None:
+    """Make ~/.factorio resolve to the per-user data dir.
+
+    On a multi-user appliance with one shared Unix account, Factorio
+    would otherwise smash everyone's saves/config/player-data together.
+    Symlinking before launch is the cleanest fix that doesn't depend on
+    Factorio CLI flags.
+
+    Migration: if ~/.factorio already exists as a real directory (from
+    an older single-user install where everything lived there), move it
+    to the current user's per-user dir on first run. Refuses to do this
+    if the per-user dir already has content — that case is ambiguous
+    enough to deserve a manual decision.
+    """
+    user_fac = paths.user_factorio_dir(username)
+    home_fac = Path.home() / ".factorio"
+
+    if home_fac.is_symlink():
+        # Already managed — repoint to whichever user is launching now.
+        home_fac.unlink()
+    elif home_fac.is_dir():
+        # Pre-existing shared data. Migrate it into the current user's
+        # per-user dir if that dir doesn't already exist.
+        if user_fac.exists():
+            raise RuntimeError(
+                f"~/.factorio is a real directory and {user_fac} already "
+                f"exists; can't decide which to keep — move one aside manually"
+            )
+        user_fac.parent.mkdir(parents=True, exist_ok=True)
+        home_fac.rename(user_fac)
+    elif home_fac.exists():
+        raise RuntimeError(f"{home_fac} exists and is neither symlink nor directory")
+
+    user_fac.mkdir(parents=True, exist_ok=True)
+    home_fac.symlink_to(user_fac, target_is_directory=True)
 
 
 def _seed_service_credentials(session: Session) -> None:

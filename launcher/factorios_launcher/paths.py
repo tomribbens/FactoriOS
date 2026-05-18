@@ -50,6 +50,13 @@ def profile_dir(username: str, profile: str, build: str | None = None) -> Path:
     return user_profiles(username, build) / profile
 
 
+def user_factorio_dir(username: str) -> Path:
+    """Per-user ~/.factorio target. Holds saves, config, player-data,
+    achievements — everything Factorio writes outside the mod directory.
+    Symlinked from ~/.factorio at launch (see profiles._link_home_factorio)."""
+    return user_dir(username) / "factorio"
+
+
 # --- versions ---------------------------------------------------------
 
 def version_id(version: str, build: str) -> str:
