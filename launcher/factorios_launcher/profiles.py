@@ -58,15 +58,17 @@ def launch(
 ) -> subprocess.Popen:
     """Spawn Factorio. Returns the Popen so the caller can wait().
 
-    `version_id` is the on-disk version directory name (e.g. "2.0.32-space-age"
-    or paths.DEMO_VERSION). `build` controls whether the profile path is
-    build-segregated (real users) or flat (guest/demo).
+    Profile separation is by mod directory only — Factorio's
+    --mod-directory is universally recognized across builds, while
+    --write-data is not (vanilla failed with `Option "write-data" does
+    not exist`). Saves and config live at the default location
+    (~/.factorio/{saves,config}) and are shared across profiles.
     """
     ensure(username, profile, build=build)
     binary = paths.factorio_binary(version_id)
-    profile_path = paths.profile_dir(username, profile, build=build)
+    mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
     return subprocess.Popen(
-        [str(binary), "--write-data", str(profile_path)],
+        [str(binary), "--mod-directory", str(mod_dir)],
         env=_factorio_env(),
     )
 
