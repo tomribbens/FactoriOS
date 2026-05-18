@@ -91,12 +91,9 @@ locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "$HOSTNAME" > /etc/hostname
 
-# factorios appliance user, fixed UID 1000 so /run/user/1000 (where
-# systemd-logind creates the runtime dir on PAM session open) matches the
-# hardcoded XDG_RUNTIME_DIR in factorios.service. NOT a system user — the
-# -r flag silently overrides -u with a system-range UID and breaks the
-# match. Belt-and-braces: factorios-base's post_install also creates this
-# user; this line is the fallback if the package never ran.
+# factorios user creation is declarative via factorios-base's sysusers.d
+# entry, which pacman triggers after each transaction. This is just a
+# safety net for the unlikely case that systemd-sysusers didn't run.
 id factorios &>/dev/null || useradd -m -u 1000 -s /usr/bin/nologin -G seat,video,input,render factorios
 
 # Passwordless root for tty/console recovery. Appliance-OS pattern:

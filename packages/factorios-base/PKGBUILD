@@ -25,6 +25,7 @@ prepare() {
     cp "$startdir/../../systemd/factorios.service"       "$srcdir/factorios.service"
     cp "$startdir/../../systemd/factorios-session"       "$srcdir/factorios-session"
     cp "$startdir/../../systemd/factorios-tmpfiles.conf" "$srcdir/factorios-tmpfiles.conf"
+    cp "$startdir/../../systemd/factorios-sysusers.conf" "$srcdir/factorios-sysusers.conf"
 }
 
 package() {
@@ -34,4 +35,6 @@ package() {
         "$pkgdir/usr/bin/factorios-session"
     install -Dm644 "$srcdir/factorios-tmpfiles.conf" \
         "$pkgdir/usr/lib/tmpfiles.d/factorios.conf"
+    install -Dm644 "$srcdir/factorios-sysusers.conf" \
+        "$pkgdir/usr/lib/sysusers.d/factorios.conf"
 }

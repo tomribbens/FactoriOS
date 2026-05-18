@@ -1,21 +1,10 @@
+# User creation and /var/lib/factorios ownership are handled declaratively
+# by /usr/lib/sysusers.d/factorios.conf and /usr/lib/tmpfiles.d/factorios.conf
+# respectively — pacman runs systemd-sysusers and systemd-tmpfiles --create
+# automatically after each transaction, so we don't need to do anything
+# imperative here.
+
 post_install() {
-    # Single shared appliance user; identity is factorio.com, not Unix.
-    # NOT a system user — we want UID 1000 so it matches the hardcoded
-    # XDG_RUNTIME_DIR=/run/user/1000 in factorios.service. `useradd --system
-    # --uid 1000` silently picks a UID in the system range (200-999) and
-    # ignores the --uid, which causes a runtime-dir mismatch (PAM session
-    # creates /run/user/<real-uid> while Wayland socket lives in
-    # /run/user/1000 → labwc and the greeter never agree on a directory).
-    # Needs `render` for /dev/dri/renderD128 on top of video for card0.
-    if ! id factorios &>/dev/null; then
-        useradd --create-home --uid 1000 \
-            --shell /usr/bin/nologin \
-            --groups seat,video,input,render \
-            factorios
-    fi
-
-    chown -R factorios:factorios /var/lib/factorios
-
     systemctl daemon-reload
     echo
     echo "FactoriOS installed. Enable the session with:"
@@ -24,7 +13,7 @@ post_install() {
 }
 
 post_upgrade() {
-    post_install
+    systemctl daemon-reload
 }
 
 pre_remove() {
