@@ -20,8 +20,11 @@ class GreeterWindow(Gtk.ApplicationWindow):
     def __init__(self, application: Gtk.Application) -> None:
         super().__init__(application=application, title="FactoriOS")
         self.set_default_size(720, 520)
-        # Fullscreen on the kiosk; harmless when run on a normal desktop.
-        self.fullscreen()
+        # Don't call self.fullscreen() — under labwc on VirtualBox's vmwgfx,
+        # the fullscreen mode-set triggers a DRM hot-unplug of the virtual
+        # connector (~13s after start), which kills the compositor and
+        # restart-loops the session. Kiosk-style fullscreening should come
+        # from the compositor config, not the app.
         self._try_remembered_login()
 
     # --- Remember-Me bootstrap ------------------------------------------

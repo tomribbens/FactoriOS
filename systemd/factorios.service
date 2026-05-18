@@ -18,6 +18,12 @@ StandardError=journal
 Environment=XDG_SESSION_TYPE=wayland
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=WLR_LIBINPUT_NO_DEVICES=1
+# wlroots workarounds for flaky VM DRM stacks (VirtualBox's vmwgfx in
+# particular). Atomic mode-setting and hardware cursors are the two
+# common offenders; turning them off costs nothing on bare metal and
+# keeps the compositor alive on VirtualBox.
+Environment=WLR_NO_HARDWARE_CURSORS=1
+Environment=WLR_DRM_NO_ATOMIC=1
 # labwc -s CMD runs CMD on startup. The greeter is the entire session.
 ExecStartPre=/usr/bin/install -d -o factorios -g factorios -m 700 /run/user/1000
 # Routed through a wrapper that captures the whole session transcript to
