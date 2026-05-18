@@ -468,7 +468,13 @@ class ChooserScreen(Gtk.Box):
 
         def do_launch():
             vid = paths.version_id(version, build)
-            p = profiles.launch(vid, self.session.username, profile, build=build)
+            # Pass the live session so launch() forwards factorio.com
+            # credentials via --service-username/--service-token; the
+            # in-game mod portal then works without a second login.
+            p = profiles.launch(
+                vid, self.session.username, profile,
+                build=build, session=self.session,
+            )
             return p.wait()
 
         def done(rc):

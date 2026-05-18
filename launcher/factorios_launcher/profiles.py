@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 
 from . import paths, versions
+from .auth import Session
 
 DEFAULT_PROFILE = "default"
 
@@ -55,6 +56,7 @@ def launch(
     username: str,
     profile: str = DEFAULT_PROFILE,
     build: str | None = None,
+    session: Session | None = None,
 ) -> subprocess.Popen:
     """Spawn Factorio. Returns the Popen so the caller can wait().
 
@@ -63,6 +65,11 @@ def launch(
     --write-data is not (vanilla failed with `Option "write-data" does
     not exist`). Saves and config live at the default location
     (~/.factorio/{saves,config}) and are shared across profiles.
+
+    If `session` has cached factorio.com credentials we forward them via
+    --service-username/--service-token so the in-game mod portal works
+    without a second login. Visible to `ps` on the local box; on a
+    single-user appliance that's an acceptable tradeoff for the UX win.
     """
     ensure(username, profile, build=build)
     # If Factorio's in-game updater bumped the install since we last
@@ -73,10 +80,13 @@ def launch(
         version_id = versions.reconcile(version_id, build)
     binary = paths.factorio_binary(version_id)
     mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
-    return subprocess.Popen(
-        [str(binary), "--mod-directory", str(mod_dir)],
-        env=_factorio_env(),
-    )
+    args = [str(binary), "--mod-directory", str(mod_dir)]
+    if session and session.username and session.token:
+        args += [
+            "--service-username", session.username,
+            "--service-token", session.token,
+        ]
+    return subprocess.Popen(args, env=_factorio_env())
 
 
 # Env vars the greeter session needs (to survive on VirtualBox vmwgfx) but
