@@ -14,7 +14,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import paths
+from . import paths, versions
 
 DEFAULT_PROFILE = "default"
 
@@ -65,6 +65,12 @@ def launch(
     (~/.factorio/{saves,config}) and are shared across profiles.
     """
     ensure(username, profile, build=build)
+    # If Factorio's in-game updater bumped the install since we last
+    # touched it, the on-disk directory name is stale. Reconcile before
+    # exec — versions.reconcile renames the dir to match `factorio
+    # --version` output and returns the (possibly new) id.
+    if build is not None:
+        version_id = versions.reconcile(version_id, build)
     binary = paths.factorio_binary(version_id)
     mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
     return subprocess.Popen(

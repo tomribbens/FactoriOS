@@ -474,6 +474,9 @@ class ChooserScreen(Gtk.Box):
         def done(rc):
             self.launch_button.set_sensitive(True)
             self.status.set_label(f"Factorio exited (status {rc}).")
+            # In-game updater may have changed the version; resync.
+            self._refresh_versions()
+            self._refresh_update_hint()
 
         def failed(exc):
             self.launch_button.set_sensitive(True)

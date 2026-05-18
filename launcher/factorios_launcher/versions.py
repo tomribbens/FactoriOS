@@ -6,7 +6,9 @@ at `versions/_demo/` (no build dimension — demo is its own build).
 
 from __future__ import annotations
 
+import re
 import shutil
+import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
@@ -14,6 +16,9 @@ from pathlib import Path
 from . import paths
 from .auth import Session
 from .download import download, ProgressCb
+
+# `factorio --version` output starts with e.g. "Version: 1.1.110 (build 60394, linux64, alpha)"
+_VERSION_RE = re.compile(r"^Version:\s+(\S+)\s")
 
 
 def list_installed() -> list[tuple[str, str]]:
@@ -85,6 +90,53 @@ def remove(version: str, build: str) -> None:
     d = paths.version_dir(paths.version_id(version, build))
     if d.exists():
         shutil.rmtree(d)
+
+
+def detect_version(version_id: str) -> str | None:
+    """Run `factorio --version` on an installed version and parse the
+    actual version string. Returns None on any failure (binary missing,
+    timeout, unexpected output)."""
+    binary = paths.factorio_binary(version_id)
+    if not binary.is_file():
+        return None
+    try:
+        out = subprocess.run(
+            [str(binary), "--version"],
+            capture_output=True, text=True, timeout=10,
+        ).stdout
+    except (subprocess.SubprocessError, OSError):
+        return None
+    for line in out.splitlines():
+        m = _VERSION_RE.match(line)
+        if m:
+            return m.group(1)
+    return None
+
+
+def reconcile(version_id: str, build: str) -> str:
+    """Bring the on-disk directory name in line with the actual Factorio
+    version inside it. Returns the (possibly renamed) version_id.
+
+    Factorio's in-game updater can upgrade an install in place; without
+    this, our chooser keeps showing the old version label until the user
+    reinstalls. No-op for the demo (its dir is name-stable).
+    """
+    if version_id == paths.DEMO_VERSION:
+        return version_id
+    actual = detect_version(version_id)
+    if not actual:
+        return version_id
+    expected = paths.version_id(actual, build)
+    if expected == version_id:
+        return version_id
+    src = paths.version_dir(version_id)
+    dst = paths.version_dir(expected)
+    if dst.exists():
+        # Don't clobber a pre-existing install with the new id. Leave the
+        # rename for the user to sort out.
+        return version_id
+    src.rename(dst)
+    return expected
 
 
 def install_demo(session: Session | None = None, progress: ProgressCb | None = None) -> Path:
