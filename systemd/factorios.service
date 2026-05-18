@@ -20,7 +20,9 @@ Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=WLR_LIBINPUT_NO_DEVICES=1
 # labwc -s CMD runs CMD on startup. The greeter is the entire session.
 ExecStartPre=/usr/bin/install -d -o factorios -g factorios -m 700 /run/user/1000
-ExecStart=/usr/bin/labwc -s /usr/bin/factorios-greeter
+# Routed through a wrapper that captures the whole session transcript to
+# /var/lib/factorios/session.log — see factorios-session for why.
+ExecStart=/usr/bin/factorios-session
 Restart=always
 RestartSec=2
 

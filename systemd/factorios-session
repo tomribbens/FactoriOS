@@ -1,0 +1,35 @@
+#!/bin/bash
+# Wrapper for the FactoriOS session. Two reasons for the indirection:
+#
+# 1. The systemd unit's StandardError=journal doesn't reliably capture
+#    stderr from grandchild processes (labwc spawns the greeter via -s,
+#    which then spawns Factorio). Redirecting fd 1+2 in a bash wrapper
+#    and exec'ing labwc means everyone in the process tree inherits the
+#    same log file. No journal filter games.
+#
+# 2. We get a single, easy-to-read transcript of one session at a known
+#    path, with environment context up top.
+#
+# The log is truncated on every start — we only ever care about the
+# latest session.
+set -euo pipefail
+
+LOG=/var/lib/factorios/session.log
+exec >"$LOG" 2>&1
+
+echo "=== $(date -Iseconds) FactoriOS session start (pid=$$) ==="
+echo "id: $(id)"
+echo "groups: $(groups)"
+echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-(unset)}"
+echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-(unset)}"
+echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-(unset)}"
+echo "PATH=$PATH"
+echo
+echo "--- /dev/dri/ ---"
+ls -la /dev/dri/ || true
+echo
+echo "--- factorios runtime dir ---"
+ls -la "${XDG_RUNTIME_DIR:-/run/user/1000}" 2>&1 || true
+echo
+echo "--- labwc -d -s factorios-greeter ---"
+exec /usr/bin/labwc -d -s /usr/bin/factorios-greeter
