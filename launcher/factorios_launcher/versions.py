@@ -55,7 +55,10 @@ def install(
         return target
 
     paths.VERSIONS.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(suffix=".tar.xz", delete=False) as tmp:
+    # Stage the tarball alongside its eventual extraction target rather
+    # than in /tmp (tmpfs, sized at ~½ RAM). Multi-GB Factorio downloads
+    # blow out tmpfs and surface as errno 122 (EDQUOT/ENOSPC).
+    with tempfile.NamedTemporaryFile(suffix=".tar.xz", delete=False, dir=str(paths.VERSIONS)) as tmp:
         tarball = Path(tmp.name)
     try:
         download(
@@ -98,7 +101,10 @@ def install_demo(session: Session | None = None, progress: ProgressCb | None = N
         session = Session()
 
     paths.VERSIONS.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(suffix=".tar.xz", delete=False) as tmp:
+    # Stage the tarball alongside its eventual extraction target rather
+    # than in /tmp (tmpfs, sized at ~½ RAM). Multi-GB Factorio downloads
+    # blow out tmpfs and surface as errno 122 (EDQUOT/ENOSPC).
+    with tempfile.NamedTemporaryFile(suffix=".tar.xz", delete=False, dir=str(paths.VERSIONS)) as tmp:
         tarball = Path(tmp.name)
     try:
         download(session, tarball, version="latest", build="demo", progress=progress)
