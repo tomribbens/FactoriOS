@@ -83,7 +83,31 @@ def install(
             extracted.rename(target)
     finally:
         tarball.unlink(missing_ok=True)
+    ensure_system_data_mode(vid)
     return target
+
+
+def ensure_system_data_mode(version_id: str) -> None:
+    """Flip a Factorio install from "portable" mode (data lives next to
+    the binary) to "system" mode (data lives in ~/.factorio).
+
+    The standalone Linux tarball ships without config-path.cfg, which
+    makes Factorio default to portable mode — it then reads and writes
+    player-data.json, config/config.ini, saves/, and mods/ INSIDE the
+    install dir, ignoring ~/.factorio entirely. That breaks our per-user
+    data isolation (the ~/.factorio symlink we set up at launch points
+    to /var/lib/factorios/users/<u>/factorio, but Factorio never looks
+    there) and means our credential/config seeding has no effect.
+
+    Writing this one-line config-path.cfg in the install root tells
+    Factorio to use the platform default (~/.factorio on Linux), which
+    is exactly what our architecture assumes everywhere else.
+
+    Idempotent: safe to re-call on every launch to retrofit installs
+    that predate this fix.
+    """
+    cfg = paths.version_dir(version_id) / "config-path.cfg"
+    cfg.write_text("use-system-read-write-data-directories=true\n")
 
 
 def remove(version: str, build: str) -> None:

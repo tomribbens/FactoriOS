@@ -84,6 +84,11 @@ def launch(
     # --version` output and returns the (possibly new) id.
     if build is not None:
         version_id = versions.reconcile(version_id, build)
+    # Retrofit older installs: the standalone Factorio tarball ships in
+    # portable mode (data inside the install dir), which silently bypasses
+    # our ~/.factorio symlink and credential seeding. Flip it to system
+    # mode every launch — idempotent, costs one tiny file write.
+    versions.ensure_system_data_mode(version_id)
     if session:
         _seed_service_credentials(session)
     _seed_config_ini()
