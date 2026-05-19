@@ -190,6 +190,7 @@ pacstrap -K /mnt \
     networkmanager \
     labwc seatd \
     mesa vulkan-icd-loader \
+    pipewire pipewire-pulse pipewire-alsa wireplumber \
     python python-requests python-gobject gtk4 \
     factorios-launcher factorios-greeter factorios-base
 
