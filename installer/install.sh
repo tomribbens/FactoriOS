@@ -204,8 +204,12 @@ echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "KEYMAP=$KEYBOARD" > /etc/vconsole.conf
-# XKB layout for Wayland/X11 (labwc + the greeter read this via
-# libxkbcommon). vconsole.conf alone doesn't carry into Wayland.
+# XKB layout for Wayland/X11. Two files because two consumers:
+#   * /etc/X11/xorg.conf.d/00-keyboard.conf — for any Xwayland client
+#     (Factorio itself runs native, but kept for safety).
+#   * /etc/xdg/labwc/environment — labwc (and other wlroots compositors)
+#     do NOT read xorg.conf.d; they pick up XKB_DEFAULT_* env vars via
+#     xkbcommon at startup. labwc sources this file before launching.
 mkdir -p /etc/X11/xorg.conf.d
 cat > /etc/X11/xorg.conf.d/00-keyboard.conf <<KB
 Section "InputClass"
@@ -215,6 +219,11 @@ Section "InputClass"
 $( [[ -n "$XKB_VARIANT" ]] && echo "    Option \"XkbVariant\" \"$XKB_VARIANT\"" )
 EndSection
 KB
+mkdir -p /etc/xdg/labwc
+cat > /etc/xdg/labwc/environment <<ENV
+XKB_DEFAULT_LAYOUT=$XKB_LAYOUT
+${XKB_VARIANT:+XKB_DEFAULT_VARIANT=$XKB_VARIANT}
+ENV
 echo "$HOSTNAME" > /etc/hostname
 
 # factorios user creation is declarative via factorios-base's sysusers.d

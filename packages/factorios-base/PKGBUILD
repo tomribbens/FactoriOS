@@ -17,6 +17,9 @@ depends=(
     'mesa'
     'vulkan-icd-loader'
     'networkmanager'
+    # The greeter's Updates… button shells out to `sudo pacman` via a
+    # sudoers.d rule shipped by this package. `base` doesn't pull sudo.
+    'sudo'
 )
 source=()
 install=factorios-base.install

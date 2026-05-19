@@ -110,7 +110,17 @@ jobs:
           # try to mkdir anywhere.
           sudo chown -R "$USER":"$USER" .
           mkdir -p gh-pages-stage/x86_64
-          cp iso/airootfs/var/cache/factorios-repo/* gh-pages-stage/x86_64/
+          src=iso/airootfs/var/cache/factorios-repo
+          # Copy the package files as-is.
+          cp "$src"/*.pkg.tar.zst gh-pages-stage/x86_64/
+          # `repo-add` creates {factorios.db,factorios.files} as symlinks
+          # to the corresponding .tar.zst — pacman requests them by the
+          # short name. GitHub Pages doesn't reliably serve symlinks, so
+          # materialize both names as regular files.
+          for stem in factorios.db factorios.files; do
+              cp "$src/$stem.tar.zst" "gh-pages-stage/x86_64/$stem.tar.zst"
+              cp "$src/$stem.tar.zst" "gh-pages-stage/x86_64/$stem"
+          done
           # Convenience landing page so a browser visit isn't a 404.
           cat > gh-pages-stage/index.html <<'EOF'
           <!doctype html><meta charset=utf-8><title>FactoriOS pacman repo</title>
