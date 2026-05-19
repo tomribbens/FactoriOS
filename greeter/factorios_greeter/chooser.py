@@ -156,8 +156,9 @@ class ChooserScreen(Gtk.Box):
         """Compare latest stable for the current build against the newest
         installed version and show a hint when there's an upgrade
         available. Lazy-fetches latest-releases on first request per build
-        and caches per-session (no automatic invalidation — re-login to
-        refresh)."""
+        and caches per-session; the launch handler evicts the cache for
+        the build that just ran when Factorio exits, so the post-play
+        refresh always re-fetches."""
         build = self._build
         cached = self._releases.get(build)
 
@@ -547,7 +548,15 @@ class ChooserScreen(Gtk.Box):
         def done(rc):
             self.launch_button.set_sensitive(True)
             self.status.set_label(f"Factorio exited (status {rc}).")
-            # In-game updater may have changed the version; resync.
+            # In-game updater may have bumped the install during this
+            # session — rename the dir to match the new version before
+            # we re-read the installed list, so the dropdown picks it
+            # up immediately instead of on a later refresh.
+            versions.reconcile_all(build)
+            # factorio.com may also have shipped a new stable while we
+            # played; drop the cached upstream-releases for this build
+            # so the hint re-fetches instead of re-rendering stale data.
+            self._releases.pop(build, None)
             self._refresh_versions()
             self._refresh_update_hint()
 

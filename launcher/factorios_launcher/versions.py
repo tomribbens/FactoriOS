@@ -139,6 +139,15 @@ def reconcile(version_id: str, build: str) -> str:
     return expected
 
 
+def reconcile_all(build: str) -> None:
+    """Reconcile every installed version for a build. Used post-launch
+    to catch in-game updates without having to track which specific
+    version_id was just played (the dir may have been renamed during
+    the session, so the pre-launch id is unreliable)."""
+    for version in list_installed_for_build(build):
+        reconcile(paths.version_id(version, build), build)
+
+
 def install_demo(session: Session | None = None, progress: ProgressCb | None = None) -> Path:
     """Download and extract the Factorio demo. No-op if already installed.
 
