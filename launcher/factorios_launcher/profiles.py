@@ -173,16 +173,23 @@ def _seed_service_credentials(session: Session) -> None:
 
 
 def _seed_config_ini() -> None:
-    """Disable Factorio's in-game auto-updater.
+    """Write [path] and [other] sections of Factorio's config.ini.
 
-    FactoriOS owns version management — the chooser surfaces upstream
-    releases and downloads them explicitly. Letting Factorio update
-    itself in place would diverge the on-disk binary from our version
-    metadata (we'd reconcile after, but the user shouldn't get version
-    surprises from a second updater).
+    [path] needs explicit `read-data` and `write-data`. With just
+    use-system-read-write-data-directories=true in config-path.cfg,
+    Factorio sends BOTH paths into ~/.factorio — and the core/ game
+    package isn't there, so startup fails with "no package core". We
+    override here:
+      * read-data = install_dir/data (where core/ actually lives)
+      * write-data = ~/.factorio (per-user via symlink)
+    The __PATH__…__ tokens DO expand inside config.ini (unlike
+    config-path.cfg), so this is the right place to set them.
 
-    Preserves any other config.ini keys already set. Factorio's config.ini
-    is plain INI; configparser handles it fine.
+    [other] disables the in-game auto-updater. FactoriOS owns version
+    management — the chooser surfaces upstream releases and downloads
+    them explicitly.
+
+    Preserves any other config.ini keys/sections already set.
     """
     cfg_path = Path.home() / ".factorio" / "config" / "config.ini"
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
@@ -195,12 +202,19 @@ def _seed_config_ini() -> None:
         except configparser.Error:
             cfg = configparser.ConfigParser()
             cfg.optionxform = str
+    if not cfg.has_section("path"):
+        cfg.add_section("path")
+    cfg.set("path", "read-data", "__PATH__executable__/../../data")
+    cfg.set("path", "write-data", "__PATH__system-write-data__")
     if not cfg.has_section("other"):
         cfg.add_section("other")
     cfg.set("other", "check-updates", "false")
     with cfg_path.open("w") as f:
         cfg.write(f, space_around_delimiters=False)
-    print(f"seed: config.ini check-updates=false at {cfg_path}", file=sys.stderr)
+    print(
+        f"seed: config.ini [path] read+write + [other] check-updates=false at {cfg_path}",
+        file=sys.stderr,
+    )
 
 
 # Env vars the greeter session needs (to survive on VirtualBox vmwgfx) but
