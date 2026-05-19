@@ -25,6 +25,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Bump pkgrel to the CI run number
+        # The PKGBUILDs ship with pkgrel=1 so a local `./build.sh` keeps
+        # producing a sane (and stable) 0.1.0-1. In CI we want each push
+        # to publish a *strictly newer* version than the previous, or
+        # pacman -Syu on an installed system sees nothing to upgrade.
+        # GITHUB_RUN_NUMBER is monotonic per workflow per repo, exactly
+        # what pkgrel wants.
+        run: |
+          set -euo pipefail
+          for pb in packages/*/PKGBUILD; do
+              sed -i "s/^pkgrel=.*/pkgrel=${GITHUB_RUN_NUMBER}/" "$pb"
+          done
+          grep -H '^pkgrel=' packages/*/PKGBUILD
+
       - name: Build ISOs in Arch container
         # mkarchiso needs CAP_SYS_ADMIN, loop devices, and the ability to
         # bind-mount inside chroots. The simplest path is a privileged Arch

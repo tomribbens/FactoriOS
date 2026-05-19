@@ -262,7 +262,13 @@ systemctl set-default graphical.target
 # Add the [factorios] repo so pacman -Syu can pull updates to our own
 # packages alongside everything else. CI publishes to GitHub Pages on
 # every push to main.
-cat >> /etc/pacman.conf <<PACMAN
+#
+# Inner heredoc must be quoted ('PACMAN'): we're already inside the
+# arch-chroot's unquoted heredoc, so without the quotes the chroot's
+# bash expands \$arch again — to empty, since \$arch is unset there —
+# and pacman ends up requesting .../FactoriOS/factorios.db instead of
+# .../FactoriOS/x86_64/factorios.db.
+cat >> /etc/pacman.conf <<'PACMAN'
 
 [factorios]
 SigLevel = Optional TrustAll
