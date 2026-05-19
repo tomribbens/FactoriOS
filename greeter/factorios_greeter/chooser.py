@@ -7,6 +7,7 @@ own only Vanilla, the Build row is hidden and the build is fixed to vanilla.
 
 from __future__ import annotations
 
+import json
 from typing import Callable
 
 import gi
@@ -36,8 +37,20 @@ class ChooserScreen(Gtk.Box):
         self.session = session
         self._on_switch_user = on_switch_user
 
-        # Default build = Space Age if owned, else Vanilla.
-        self._build = paths.DEFAULT_BUILD if session.has_space_age else paths.BUILD_VANILLA
+        # Last-launched (build, version, profile) — used to pre-select the
+        # combos on startup so a reboot resumes where the user left off.
+        # Loaded once; refresh methods consult it when populating models.
+        self._last_launch = self._load_last_launch()
+
+        # Default build = remembered build (if owned), else Space Age if
+        # owned, else Vanilla.
+        remembered_build = (self._last_launch or {}).get("build")
+        if remembered_build in (paths.BUILD_SPACE_AGE, paths.BUILD_VANILLA) and (
+            session.has_space_age or remembered_build == paths.BUILD_VANILLA
+        ):
+            self._build = remembered_build
+        else:
+            self._build = paths.DEFAULT_BUILD if session.has_space_age else paths.BUILD_VANILLA
 
         header = Gtk.Label(label=f"Signed in as {session.username}")
         header.add_css_class("title-2")
@@ -51,6 +64,8 @@ class ChooserScreen(Gtk.Box):
         build_labels = [paths.BUILD_DISPLAY[b] for b in (paths.BUILD_SPACE_AGE, paths.BUILD_VANILLA)]
         self._build_order = (paths.BUILD_SPACE_AGE, paths.BUILD_VANILLA)
         self.build_combo = Gtk.DropDown.new_from_strings(build_labels)
+        if self._build in self._build_order:
+            self.build_combo.set_selected(self._build_order.index(self._build))
         self.build_combo.connect("notify::selected", self._on_build_changed)
         self.build_row.append(self.build_combo)
         self.append(self.build_row)
@@ -145,10 +160,24 @@ class ChooserScreen(Gtk.Box):
             self._refresh_profiles()
             self._refresh_update_hint()
 
+    def _preselect(self, combo: Gtk.DropDown, items: list[str], wanted: str | None) -> None:
+        if wanted is not None and wanted in items:
+            combo.set_selected(items.index(wanted))
+
+    def _remembered_for_current_build(self, key: str) -> str | None:
+        """Return the saved version/profile only if it was recorded against
+        the build that's currently selected — otherwise the pre-selection
+        bias should not carry across builds."""
+        if not self._last_launch or self._last_launch.get("build") != self._build:
+            return None
+        return self._last_launch.get(key)
+
     def _refresh_versions(self) -> None:
         installed = versions.list_installed_for_build(self._build)
-        model = Gtk.StringList.new(installed or ["(none installed)"])
-        self.version_combo.set_model(model)
+        items = installed or ["(none installed)"]
+        self.version_combo.set_model(Gtk.StringList.new(items))
+        if installed:
+            self._preselect(self.version_combo, installed, self._remembered_for_current_build("version"))
         self.launch_button.set_sensitive(bool(installed))
         self.delete_version_button.set_sensitive(bool(installed))
 
@@ -210,6 +239,7 @@ class ChooserScreen(Gtk.Box):
         on_disk = profiles.list_profiles(self.session.username, build=self._build)
         profs = on_disk or [profiles.DEFAULT_PROFILE]
         self.profile_combo.set_model(Gtk.StringList.new(profs))
+        self._preselect(self.profile_combo, profs, self._remembered_for_current_build("profile"))
         # Only allow delete when a profile actually exists on disk —
         # the DEFAULT_PROFILE fallback in the dropdown is a placeholder.
         self.delete_profile_button.set_sensitive(bool(on_disk))
@@ -221,6 +251,27 @@ class ChooserScreen(Gtk.Box):
             return None
         item = model.get_item(idx)
         return item.get_string() if item else None
+
+    def _load_last_launch(self) -> dict | None:
+        p = paths.user_last_launch(self.session.username)
+        try:
+            data = json.loads(p.read_text())
+        except (OSError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def _save_last_launch(self, build: str, version: str, profile: str) -> None:
+        p = paths.user_last_launch(self.session.username)
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps({"build": build, "version": version, "profile": profile}))
+        except OSError:
+            # Not worth surfacing — pre-selection is a convenience, not
+            # load-bearing. Worst case the next boot uses defaults.
+            pass
+        # Keep our in-memory copy in sync so an in-session build flip
+        # still pre-selects this version/profile if the user flips back.
+        self._last_launch = {"build": build, "version": version, "profile": profile}
 
     # --- actions ---------------------------------------------------------
 
@@ -533,6 +584,10 @@ class ChooserScreen(Gtk.Box):
             return
         self.status.set_label(f"Launching Factorio {version} ({paths.BUILD_DISPLAY[build]})…")
         self.launch_button.set_sensitive(False)
+        # Remember the user's choice so a reboot resumes the same triple.
+        # Done synchronously (a tiny JSON write) before the worker thread
+        # starts, so a crash during the run still leaves the record.
+        self._save_last_launch(build, version, profile)
 
         def do_launch():
             vid = paths.version_id(version, build)

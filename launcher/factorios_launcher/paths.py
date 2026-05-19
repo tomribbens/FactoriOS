@@ -57,6 +57,12 @@ def user_factorio_dir(username: str) -> Path:
     return user_dir(username) / "factorio"
 
 
+def user_last_launch(username: str) -> Path:
+    """Per-user record of the last (build, version, profile) chosen for
+    launch. Read on greeter startup to pre-select the same triple."""
+    return user_dir(username) / "last-launch.json"
+
+
 # --- versions ---------------------------------------------------------
 
 def version_id(version: str, build: str) -> str:
