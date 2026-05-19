@@ -105,9 +105,18 @@ def ensure_system_data_mode(version_id: str) -> None:
 
     Idempotent: safe to re-call on every launch to retrofit installs
     that predate this fix.
+
+    Both keys are required: Factorio parses the file as a property tree
+    and refuses to start if `config-path` is missing (Util.cpp asserts
+    "value must be a string in the property tree at ROOT.config-path").
+    The use-system flag overrides the actual path resolution, but the
+    key still has to be present.
     """
     cfg = paths.version_dir(version_id) / "config-path.cfg"
-    cfg.write_text("use-system-read-write-data-directories=true\n")
+    cfg.write_text(
+        "config-path=__PATH__system-write-data__/config/config.ini\n"
+        "use-system-read-write-data-directories=true\n"
+    )
 
 
 def remove(version: str, build: str) -> None:
