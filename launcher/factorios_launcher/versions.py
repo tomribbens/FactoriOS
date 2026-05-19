@@ -109,12 +109,17 @@ def ensure_system_data_mode(version_id: str) -> None:
     Both keys are required: Factorio parses the file as a property tree
     and refuses to start if `config-path` is missing (Util.cpp asserts
     "value must be a string in the property tree at ROOT.config-path").
-    The use-system flag overrides the actual path resolution, but the
-    key still has to be present.
+
+    config-path.cfg does NOT expand the __PATH__…__ tokens — those only
+    expand inside config.ini's [path] section. So `config-path` here has
+    to be either an absolute path or relative to __PATH__executable__.
+    We use an absolute /home/factorios/.factorio/... because the
+    factorios user's home is fixed declaratively (sysusers.d) and the
+    ~/.factorio symlink we create at launch always lands there.
     """
     cfg = paths.version_dir(version_id) / "config-path.cfg"
     cfg.write_text(
-        "config-path=__PATH__system-write-data__/config/config.ini\n"
+        "config-path=/home/factorios/.factorio/config/config.ini\n"
         "use-system-read-write-data-directories=true\n"
     )
 
