@@ -132,8 +132,16 @@ def reconcile(version_id: str, build: str) -> str:
     src = paths.version_dir(version_id)
     dst = paths.version_dir(expected)
     if dst.exists():
-        # Don't clobber a pre-existing install with the new id. Leave the
-        # rename for the user to sort out.
+        # Both src and dst now claim the same version — typically because
+        # the in-game updater bumped src to a release that was already
+        # installed separately at dst. Verify dst really is what its name
+        # says, then drop the now-redundant src. Version dirs hold no
+        # per-user state (that lives under users/<u>/), so this is
+        # lossless. If dst's name lies about its content, bail rather
+        # than compound the mess.
+        if detect_version(expected) == actual:
+            shutil.rmtree(src)
+            return expected
         return version_id
     src.rename(dst)
     return expected
