@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  labwc config for the FactoriOS kiosk session. Kept minimal: we override
+  labwc's defaults only where we want them suppressed.
+
+  The default rc.xml binds right-click on the root surface to the system
+  "root-menu" (Terminal / Reconfigure / Exit). On a kiosk that menu is a
+  trapdoor out of the appliance, so the Root context is declared with no
+  mousebinds — labwc honours the empty section and does nothing on click.
+-->
+<labwc_config>
+  <mouse>
+    <context name="Root">
+    </context>
+  </mouse>
+</labwc_config>

@@ -30,6 +30,7 @@ prepare() {
     cp "$startdir/../../systemd/factorios-tmpfiles.conf"    "$srcdir/factorios-tmpfiles.conf"
     cp "$startdir/../../systemd/factorios-sysusers.conf"    "$srcdir/factorios-sysusers.conf"
     cp "$startdir/../../systemd/factorios-pacman.sudoers"   "$srcdir/factorios-pacman.sudoers"
+    cp "$startdir/../../systemd/factorios-labwc-rc.xml"     "$srcdir/factorios-labwc-rc.xml"
 }
 
 package() {
@@ -44,4 +45,9 @@ package() {
     # sudoers files must be mode 440 — sudo refuses to read otherwise.
     install -Dm440 "$srcdir/factorios-pacman.sudoers" \
         "$pkgdir/etc/sudoers.d/factorios-pacman"
+    # labwc kiosk overrides. /etc/xdg/labwc/ is one of the directories
+    # labwc searches per XDG; rc.xml here suppresses the default root
+    # menu so right-click on the empty surface does nothing.
+    install -Dm644 "$srcdir/factorios-labwc-rc.xml" \
+        "$pkgdir/etc/xdg/labwc/rc.xml"
 }
