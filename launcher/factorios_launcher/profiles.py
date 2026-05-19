@@ -9,10 +9,12 @@ The guest/demo flow is flat (no build dimension):
 
 from __future__ import annotations
 
+import configparser
 import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from . import paths, versions
@@ -84,6 +86,7 @@ def launch(
         version_id = versions.reconcile(version_id, build)
     if session:
         _seed_service_credentials(session)
+    _seed_config_ini()
     binary = paths.factorio_binary(version_id)
     mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
     return subprocess.Popen(
@@ -132,14 +135,24 @@ def _link_home_factorio(username: str) -> None:
 def _seed_service_credentials(session: Session) -> None:
     """Write service-username + service-token into ~/.factorio/player-data.json
     so the in-game mod portal skips its own login. Preserves any other
-    fields already in the file (Factorio writes lots of state in there)."""
+    fields already in the file (Factorio writes lots of state in there).
+
+    Prints a one-line summary to stderr (captured in the session log) so
+    you can confirm the seed actually ran without digging into the JSON.
+    """
     if not (session.username and session.token):
+        print(
+            f"seed: skipping player-data.json — session missing "
+            f"username={bool(session.username)} token={bool(session.token)}",
+            file=sys.stderr,
+        )
         return
     fac_dir = Path.home() / ".factorio"
     fac_dir.mkdir(parents=True, exist_ok=True)
     pd = fac_dir / "player-data.json"
+    pre_existing = pd.exists()
     data: dict = {}
-    if pd.exists():
+    if pre_existing:
         try:
             data = json.loads(pd.read_text())
         except (json.JSONDecodeError, OSError):
@@ -147,6 +160,42 @@ def _seed_service_credentials(session: Session) -> None:
     data["service-username"] = session.username
     data["service-token"] = session.token
     pd.write_text(json.dumps(data, indent=2))
+    print(
+        f"seed: player-data.json written ({'patched' if pre_existing else 'created'}) "
+        f"at {pd} for {session.username}",
+        file=sys.stderr,
+    )
+
+
+def _seed_config_ini() -> None:
+    """Disable Factorio's in-game auto-updater.
+
+    FactoriOS owns version management — the chooser surfaces upstream
+    releases and downloads them explicitly. Letting Factorio update
+    itself in place would diverge the on-disk binary from our version
+    metadata (we'd reconcile after, but the user shouldn't get version
+    surprises from a second updater).
+
+    Preserves any other config.ini keys already set. Factorio's config.ini
+    is plain INI; configparser handles it fine.
+    """
+    cfg_path = Path.home() / ".factorio" / "config" / "config.ini"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = configparser.ConfigParser()
+    # Factorio's keys are case-sensitive; default ConfigParser lowercases.
+    cfg.optionxform = str
+    if cfg_path.exists():
+        try:
+            cfg.read(cfg_path)
+        except configparser.Error:
+            cfg = configparser.ConfigParser()
+            cfg.optionxform = str
+    if not cfg.has_section("other"):
+        cfg.add_section("other")
+    cfg.set("other", "check-updates", "false")
+    with cfg_path.open("w") as f:
+        cfg.write(f, space_around_delimiters=False)
+    print(f"seed: config.ini check-updates=false at {cfg_path}", file=sys.stderr)
 
 
 # Env vars the greeter session needs (to survive on VirtualBox vmwgfx) but
