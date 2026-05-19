@@ -94,8 +94,18 @@ def launch(
     _seed_config_ini()
     binary = paths.factorio_binary(version_id)
     mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
+    # --config is honored even when it points at an absolute path
+    # (config-path.cfg's `config-path` key silently ignores absolutes;
+    # only --config does). Our seeded config.ini has [path] read-data
+    # pointing back into the install tree and write-data resolving to
+    # __PATH__system-write-data__ (= ~/.factorio, then symlinked per-user).
+    config_ini = Path.home() / ".factorio" / "config" / "config.ini"
     return subprocess.Popen(
-        [str(binary), "--mod-directory", str(mod_dir)],
+        [
+            str(binary),
+            "--config", str(config_ini),
+            "--mod-directory", str(mod_dir),
+        ],
         env=_factorio_env(),
     )
 

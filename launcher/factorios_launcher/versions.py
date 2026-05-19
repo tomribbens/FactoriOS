@@ -88,39 +88,25 @@ def install(
 
 
 def ensure_system_data_mode(version_id: str) -> None:
-    """Flip a Factorio install from "portable" mode (data lives next to
-    the binary) to "system" mode (data lives in ~/.factorio).
+    """Restore the tarball's shipped config-path.cfg.
 
-    The standalone Linux tarball ships without config-path.cfg, which
-    makes Factorio default to portable mode — it then reads and writes
-    player-data.json, config/config.ini, saves/, and mods/ INSIDE the
-    install dir, ignoring ~/.factorio entirely. That breaks our per-user
-    data isolation (the ~/.factorio symlink we set up at launch points
-    to /var/lib/factorios/users/<u>/factorio, but Factorio never looks
-    there) and means our credential/config seeding has no effect.
+    The standalone Linux tarball ships a config-path.cfg with the safe
+    defaults below. Older versions of this code wrote a broken file in
+    its place (absolute `config-path` is silently ignored, and
+    use-system=true with no override sends read-data to /usr/share/
+    factorio where our `core/` package isn't). Once we switched to
+    redirecting Factorio via `--config` on the command line + an
+    explicit `[path]` in config.ini, the bootstrap file's contents
+    became irrelevant for path resolution — but a *malformed* one
+    still fails the property-tree parse at startup, so reset it to
+    the shipped defaults to be safe across retrofits.
 
-    Writing this one-line config-path.cfg in the install root tells
-    Factorio to use the platform default (~/.factorio on Linux), which
-    is exactly what our architecture assumes everywhere else.
-
-    Idempotent: safe to re-call on every launch to retrofit installs
-    that predate this fix.
-
-    Both keys are required: Factorio parses the file as a property tree
-    and refuses to start if `config-path` is missing (Util.cpp asserts
-    "value must be a string in the property tree at ROOT.config-path").
-
-    config-path.cfg does NOT expand the __PATH__…__ tokens — those only
-    expand inside config.ini's [path] section. So `config-path` here has
-    to be either an absolute path or relative to __PATH__executable__.
-    We use an absolute /home/factorios/.factorio/... because the
-    factorios user's home is fixed declaratively (sysusers.d) and the
-    ~/.factorio symlink we create at launch always lands there.
+    Idempotent: re-called on every launch.
     """
     cfg = paths.version_dir(version_id) / "config-path.cfg"
     cfg.write_text(
-        "config-path=/home/factorios/.factorio/config/config.ini\n"
-        "use-system-read-write-data-directories=true\n"
+        "config-path=__PATH__executable__/../../config\n"
+        "use-system-read-write-data-directories=false\n"
     )
 
 
