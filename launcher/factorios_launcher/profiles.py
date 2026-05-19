@@ -183,21 +183,23 @@ def _seed_service_credentials(session: Session) -> None:
 
 
 def _seed_config_ini() -> None:
-    """Write [path] and [other] sections of Factorio's config.ini.
+    """Write the [path] section of Factorio's config.ini.
 
-    [path] needs explicit `read-data` and `write-data`. With just
-    use-system-read-write-data-directories=true in config-path.cfg,
-    Factorio sends BOTH paths into ~/.factorio — and the core/ game
-    package isn't there, so startup fails with "no package core". We
-    override here:
+    Factorio's startup defaults send both read-data and write-data into
+    /usr/share/factorio (the Linux distro convention), where our `core/`
+    game package isn't. Override:
       * read-data = install_dir/data (where core/ actually lives)
       * write-data = ~/.factorio (per-user via symlink)
     The __PATH__…__ tokens DO expand inside config.ini (unlike
     config-path.cfg), so this is the right place to set them.
 
-    [other] disables the in-game auto-updater. FactoriOS owns version
-    management — the chooser surfaces upstream releases and downloads
-    them explicitly.
+    Earlier versions of this function also wrote [other] check-updates=false
+    — but `check-updates` isn't a real config key. Factorio's parser
+    rejects unknown keys with a "Configuration file has invalid contents.
+    Do you want to reset it?" dialog. There's no per-config disable for
+    the update check in current Factorio; the relevant valid key is
+    `force-enable-factorio-version-check` and it doesn't do what its
+    name suggests for our purposes.
 
     Preserves any other config.ini keys/sections already set.
     """
@@ -216,15 +218,13 @@ def _seed_config_ini() -> None:
         cfg.add_section("path")
     cfg.set("path", "read-data", "__PATH__executable__/../../data")
     cfg.set("path", "write-data", "__PATH__system-write-data__")
-    if not cfg.has_section("other"):
-        cfg.add_section("other")
-    cfg.set("other", "check-updates", "false")
+    # Drop a stale [other] check-updates=false from previous seeds —
+    # if left behind, Factorio still rejects the file as invalid.
+    if cfg.has_section("other") and cfg.has_option("other", "check-updates"):
+        cfg.remove_option("other", "check-updates")
     with cfg_path.open("w") as f:
         cfg.write(f, space_around_delimiters=False)
-    print(
-        f"seed: config.ini [path] read+write + [other] check-updates=false at {cfg_path}",
-        file=sys.stderr,
-    )
+    print(f"seed: config.ini [path] at {cfg_path}", file=sys.stderr)
 
 
 # Env vars the greeter session needs (to survive on VirtualBox vmwgfx) but
