@@ -7,13 +7,18 @@ the Factorio binary itself uses, is *not* gated and accepts a simple form
 POST. Downloads then use ?username=&token= query params instead of a
 session cookie.
 
-Response shape on success (as of 2026-05): {"token": "...", ...} or
-{"data": {"token": "..."}, "status": 200}. We accept both.
+We always send api_version=6 (the latest at time of writing per
+https://wiki.factorio.com/Web_authentication_API). On v6 the response is
+always {token, username} on success or {error, message, data: {}} on
+failure — both at HTTP 200. v≤3 returned a bare array of tokens with no
+username; we'd then have to use whatever the user *typed* as the canonical
+account name, which fails if they entered an email or the wrong case.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import requests
@@ -23,6 +28,7 @@ from . import paths
 LOGIN_URL = "https://auth.factorio.com/api-login"
 EXPANSION_PROBE_URL = "https://www.factorio.com/get-download/latest/expansion/linux64"
 USER_AGENT = "FactoriOS-greeter/0.1"
+API_VERSION = "6"
 
 
 class AuthError(Exception):
@@ -48,7 +54,11 @@ class Session:
         try:
             r = self.http.post(
                 LOGIN_URL,
-                data={"username": username_or_email, "password": password},
+                data={
+                    "username": username_or_email,
+                    "password": password,
+                    "api_version": API_VERSION,
+                },
                 timeout=30,
             )
         except requests.RequestException as exc:
@@ -61,9 +71,14 @@ class Session:
                 f"unexpected non-JSON response (status {r.status_code}) from {LOGIN_URL}"
             )
 
+        # v4+ returns HTTP 200 for both success and failure; the `error`
+        # field is the actual signal. We still check status_code as a
+        # belt-and-braces for surprising shapes.
+        if isinstance(payload, dict) and payload.get("error"):
+            msg = payload.get("message") or payload.get("error")
+            raise AuthError(msg)
         if r.status_code != 200:
-            # Error shape: {"data":{},"error":"login-failed","message":"...","status":401}
-            msg = payload.get("message") or payload.get("error") or f"HTTP {r.status_code}"
+            msg = (payload.get("message") if isinstance(payload, dict) else None) or f"HTTP {r.status_code}"
             raise AuthError(msg)
 
         token, returned_username = _extract_token(payload)
@@ -71,6 +86,13 @@ class Session:
             raise AuthError("login succeeded but no token in response")
         self.username = returned_username or username_or_email
         self.token = token
+        # Diagnostic: confirm which username/token shape we actually got
+        # — lands in /tmp/factorios-session.log alongside the seed lines.
+        print(
+            f"auth: api_version={API_VERSION} token={token[:6]}…({len(token)} chars) "
+            f"username={self.username!r} (returned={returned_username!r}, typed={username_or_email!r})",
+            file=sys.stderr,
+        )
         self.check_entitlements()
         return self
 
