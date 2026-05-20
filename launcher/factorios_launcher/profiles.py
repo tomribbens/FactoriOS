@@ -13,6 +13,7 @@ The guest/demo flow is flat (no build dimension):
 from __future__ import annotations
 
 import configparser
+import glob
 import json
 import os
 import shutil
@@ -69,6 +70,7 @@ def launch(
     profile: str = DEFAULT_PROFILE,
     build: str | None = None,
     session: Session | None = None,
+    use_mimalloc: bool = True,
 ) -> subprocess.Popen:
     """Spawn Factorio. Returns the Popen so the caller can wait().
 
@@ -114,7 +116,7 @@ def launch(
     config_ini = Path.home() / ".factorio" / "config" / "config.ini"
     return subprocess.Popen(
         [str(binary), "--config", str(config_ini)],
-        env=_factorio_env(),
+        env=_factorio_env(use_mimalloc=use_mimalloc),
     )
 
 
@@ -328,10 +330,47 @@ _GREETER_ONLY_ENV = (
 )
 
 
-def _factorio_env() -> dict[str, str]:
+def _factorio_env(use_mimalloc: bool = True) -> dict[str, str]:
     """Inherit the greeter's env but strip the keys that would force
-    Factorio onto software rendering or otherwise confuse its renderer."""
+    Factorio onto software rendering or otherwise confuse its renderer.
+
+    When `use_mimalloc` is True (the default), preload libmimalloc via
+    LD_PRELOAD if a versioned copy is installed under /usr/lib. Scoped
+    to the Factorio child only — the greeter/labwc must not inherit it.
+    """
     env = os.environ.copy()
     for k in _GREETER_ONLY_ENV:
         env.pop(k, None)
+    if use_mimalloc:
+        lib = _mimalloc_path()
+        if lib:
+            existing = env.get("LD_PRELOAD", "")
+            env["LD_PRELOAD"] = f"{lib}:{existing}" if existing else lib
+        else:
+            print(
+                "factorios: mimalloc not found under /usr/lib; "
+                "launching without LD_PRELOAD",
+                file=sys.stderr,
+            )
     return env
+
+
+def _mimalloc_path() -> str | None:
+    """Resolve the highest-versioned libmimalloc.so.* in /usr/lib.
+
+    Skip the bare .so symlink so we never depend on a -devel package.
+    Returns None if no versioned library is installed.
+    """
+    cands = [
+        p for p in glob.glob("/usr/lib/libmimalloc.so.*")
+        if not p.endswith(".so")
+    ]
+    if not cands:
+        return None
+
+    def _ver(p: str) -> tuple[int, ...]:
+        return tuple(
+            int(x) for x in p.rsplit(".so.", 1)[1].split(".") if x.isdigit()
+        )
+
+    return max(cands, key=_ver)

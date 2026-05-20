@@ -16,6 +16,7 @@ depends=(
     'seatd'
     'mesa'
     'vulkan-icd-loader'
+    'mimalloc'
     'networkmanager'
     # The greeter's Updates… button shells out to `sudo pacman` via a
     # sudoers.d rule shipped by this package. `base` doesn't pull sudo.

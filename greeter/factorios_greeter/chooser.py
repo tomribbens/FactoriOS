@@ -120,6 +120,16 @@ class ChooserScreen(Gtk.Box):
         # --- Actions -----------------------------------------------------
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         actions.set_halign(Gtk.Align.END)
+        # mimalloc preload toggle. Default on; remembered per-user in
+        # last-launch.json alongside build/version/profile. Untick to A/B
+        # against glibc's allocator without rebuilding.
+        self.mimalloc_check = Gtk.CheckButton.new_with_label("Use mimalloc (faster)")
+        self.mimalloc_check.set_tooltip_text(
+            "Preload libmimalloc into Factorio for better late-game UPS"
+        )
+        remembered_mimalloc = (self._last_launch or {}).get("use_mimalloc", True)
+        self.mimalloc_check.set_active(bool(remembered_mimalloc))
+        actions.append(self.mimalloc_check)
         switch = Gtk.Button(label="Switch user")
         switch.connect("clicked", lambda *_: self._on_switch_user())
         actions.append(switch)
@@ -260,18 +270,26 @@ class ChooserScreen(Gtk.Box):
             return None
         return data if isinstance(data, dict) else None
 
-    def _save_last_launch(self, build: str, version: str, profile: str) -> None:
+    def _save_last_launch(
+        self, build: str, version: str, profile: str, use_mimalloc: bool,
+    ) -> None:
         p = paths.user_last_launch(self.session.username)
+        record = {
+            "build": build,
+            "version": version,
+            "profile": profile,
+            "use_mimalloc": use_mimalloc,
+        }
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps({"build": build, "version": version, "profile": profile}))
+            p.write_text(json.dumps(record))
         except OSError:
             # Not worth surfacing — pre-selection is a convenience, not
             # load-bearing. Worst case the next boot uses defaults.
             pass
         # Keep our in-memory copy in sync so an in-session build flip
         # still pre-selects this version/profile if the user flips back.
-        self._last_launch = {"build": build, "version": version, "profile": profile}
+        self._last_launch = record
 
     # --- actions ---------------------------------------------------------
 
@@ -579,6 +597,7 @@ class ChooserScreen(Gtk.Box):
         version = self._selected(self.version_combo)
         profile = self._selected(self.profile_combo) or profiles.DEFAULT_PROFILE
         build = self._build
+        use_mimalloc = self.mimalloc_check.get_active()
         if not version or version == "(none installed)":
             self.status.set_label(f"No {paths.BUILD_DISPLAY[build]} version installed. Click 'Install latest' first.")
             return
@@ -587,7 +606,7 @@ class ChooserScreen(Gtk.Box):
         # Remember the user's choice so a reboot resumes the same triple.
         # Done synchronously (a tiny JSON write) before the worker thread
         # starts, so a crash during the run still leaves the record.
-        self._save_last_launch(build, version, profile)
+        self._save_last_launch(build, version, profile, use_mimalloc)
 
         def do_launch():
             vid = paths.version_id(version, build)
@@ -597,6 +616,7 @@ class ChooserScreen(Gtk.Box):
             p = profiles.launch(
                 vid, self.session.username, profile,
                 build=build, session=self.session,
+                use_mimalloc=use_mimalloc,
             )
             return p.wait()
 
