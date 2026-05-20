@@ -346,6 +346,16 @@ def _factorio_env(use_mimalloc: bool = True) -> dict[str, str]:
         if lib:
             existing = env.get("LD_PRELOAD", "")
             env["LD_PRELOAD"] = f"{lib}:{existing}" if existing else lib
+            # If the kernel reserved 1 GiB hugepages at boot (sized by the
+            # installer against host RAM, see installer/install.sh), tell
+            # mimalloc to consume them. PURGE_DELAY=-1 keeps reserved
+            # pages held for the life of the process — purging just to
+            # re-acquire them is pointless churn for a single long-lived
+            # game session.
+            huge = _huge_pages_1g_count()
+            if huge > 0:
+                env["MIMALLOC_RESERVE_HUGE_OS_PAGES"] = str(huge)
+                env["MIMALLOC_PURGE_DELAY"] = "-1"
         else:
             print(
                 "factorios: mimalloc not found under /usr/lib; "
@@ -353,6 +363,24 @@ def _factorio_env(use_mimalloc: bool = True) -> dict[str, str]:
                 file=sys.stderr,
             )
     return env
+
+
+def _huge_pages_1g_count() -> int:
+    """Return the configured 1 GiB hugepage count from sysfs, or 0.
+
+    Zero means the kernel cmdline didn't reserve any 1 GiB pages (older
+    install pre-dating hugepage support, or host RAM was too small at
+    install time). In that case we don't ask mimalloc to use huge pages
+    at all — it'll silently fall back to regular allocations.
+    """
+    try:
+        return int(
+            Path("/sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages")
+            .read_text()
+            .strip()
+        )
+    except (OSError, ValueError):
+        return 0
 
 
 def _mimalloc_path() -> str | None:

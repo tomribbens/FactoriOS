@@ -198,6 +198,25 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 # --- 7. In-chroot config ------------------------------------------------
 log "configuring system"
+
+# Size 1 GiB hugepages for mimalloc against the host's RAM (read from
+# /proc/meminfo in the live env — the same machine that's about to boot
+# the installed system). Reserve roughly half of RAM beyond a 4 GiB
+# headroom for the kernel + labwc + Factorio's non-mimalloc allocations,
+# cap at 12 GiB so we never strand more than Factorio can usefully use.
+# Skip the cmdline params entirely under 6 GiB total — the headroom math
+# leaves nothing to reserve and the kernel complains about hugepages=0.
+mem_gib=$(awk '/^MemTotal:/ {print int($2/1048576)}' /proc/meminfo)
+if (( mem_gib >= 6 )); then
+    huge_n=$(( (mem_gib - 4) / 2 ))
+    (( huge_n > 12 )) && huge_n=12
+    HUGE_OPTS=" default_hugepagesz=1G hugepagesz=1G hugepages=${huge_n}"
+    log "reserving ${huge_n}x 1 GiB hugepages (host has ${mem_gib} GiB)"
+else
+    HUGE_OPTS=""
+    log "skipping hugepage reservation (host has ${mem_gib} GiB, need >=6)"
+fi
+
 arch-chroot /mnt /bin/bash -e <<EOF
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
@@ -252,7 +271,7 @@ cat > /boot/loader/entries/factorios.conf <<ENTRY
 title   FactoriOS
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=PARTUUID=$(blkid -s PARTUUID -o value "$ROOT") rw
+options root=PARTUUID=$(blkid -s PARTUUID -o value "$ROOT") rw${HUGE_OPTS}
 ENTRY
 
 systemctl enable NetworkManager.service
