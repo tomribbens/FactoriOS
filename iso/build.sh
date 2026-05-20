@@ -27,7 +27,17 @@ esac
 install -Dm755 "$REPO/installer/install.sh" "$HERE/airootfs/usr/local/bin/factorios-install"
 
 mkdir -p "$HERE/out"
-rm -rf "$HERE/work"
+# mkarchiso runs as root and leaves files inside work/ whose mode bits
+# (set inside the chroot, e.g. by update-ca-trust on cadir/) don't grant
+# the invoking user write on their parent dirs. A subsequent run from an
+# unprivileged user — the CI flow on tag pushes, where the slim build's
+# work/ is still there when the full build starts — can't rm them
+# without sudo, even though chown -R fixed ownership.
+if [[ $EUID -eq 0 ]]; then
+    rm -rf "$HERE/work"
+else
+    sudo rm -rf "$HERE/work"
+fi
 
 # The full variant temporarily appends linux-firmware to packages.x86_64
 # (mkarchiso has no "extra-packages" flag). The trap restores the file no
