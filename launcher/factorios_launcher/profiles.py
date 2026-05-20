@@ -98,6 +98,7 @@ def launch(
     if session:
         _seed_service_credentials(session)
     _seed_config_ini()
+    _evict_stale_achievements(username, version_id, build)
     binary = paths.factorio_binary(version_id)
     mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
     # --config is honored even when it points at an absolute path
@@ -151,6 +152,53 @@ def _link_home_factorio(username: str) -> None:
 
     user_fac.mkdir(parents=True, exist_ok=True)
     home_fac.symlink_to(user_fac, target_is_directory=True)
+
+
+def _evict_stale_achievements(username: str, version_id: str, build: str | None) -> None:
+    """Delete the user's achievements.dat if it was written by a different
+    Factorio version than the one we're about to launch.
+
+    Factorio stores a Map-version header inside achievements.dat. If we
+    launch a binary that doesn't recognise that header (different game
+    version) the player sees "Failed to load local achievement data.
+    Local achievements might be lost." — a benign one-time warning per
+    version, but annoying when testing across versions.
+
+    Tracked via a tiny sidecar file rather than reusing last-launch.json,
+    which the chooser saves BEFORE launch (so it always already matches
+    `version_id` by the time we get here). The sidecar is updated after
+    we evict so a same-version relaunch is a no-op.
+
+    Demo (no build dimension) is skipped — guest data isn't worth the
+    extra plumbing.
+    """
+    if build is None or version_id == paths.DEMO_VERSION:
+        return
+    # Derive the user-visible version string ("1.1.110") from the
+    # version_id ("1.1.110-vanilla"). If the suffix doesn't match,
+    # something is off and we'd rather do nothing than guess.
+    suffix = f"-{build}"
+    if not version_id.endswith(suffix):
+        return
+    current = version_id[: -len(suffix)]
+    sidecar = paths.user_dir(username) / "achievements-version.txt"
+    last = None
+    try:
+        last = sidecar.read_text().strip()
+    except OSError:
+        pass
+    if last == current:
+        return
+    ach = paths.user_factorio_dir(username) / "achievements.dat"
+    if ach.exists():
+        ach.unlink()
+        print(
+            f"evict: dropped achievements.dat (was {last or 'untracked'}, "
+            f"launching {current})",
+            file=sys.stderr,
+        )
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(current)
 
 
 def _seed_service_credentials(session: Session) -> None:
