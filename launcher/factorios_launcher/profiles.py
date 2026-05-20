@@ -22,6 +22,12 @@ from .auth import Session
 
 DEFAULT_PROFILE = "default"
 
+# Schema version Factorio expects at the top of config.ini as `; version=N`.
+# Without it Factorio considers the file invalid and prompts to reset.
+# Observed value in Factorio 2.0 is 13; bump if a future Factorio
+# release writes a higher number to its own freshly-generated config.
+CONFIG_INI_VERSION = 13
+
 
 def list_profiles(username: str, build: str | None = None) -> list[str]:
     d = paths.user_profiles(username, build)
@@ -220,14 +226,22 @@ def _seed_config_ini() -> None:
     cfg.set("path", "write-data", "__PATH__system-write-data__")
     # Drop a stale [other] check-updates=false from previous seeds —
     # if left behind, Factorio rejects the file as invalid. Also drop
-    # the [other] section itself if it'd be empty after that, since
-    # an empty section header may also count as "invalid contents".
+    # the [other] section itself if it'd be empty after that.
     if cfg.has_section("other") and cfg.has_option("other", "check-updates"):
         cfg.remove_option("other", "check-updates")
     if cfg.has_section("other") and not cfg.options("other"):
         cfg.remove_section("other")
     with cfg_path.open("w") as f:
         cfg.write(f, space_around_delimiters=False)
+    # Prepend the schema version marker. Factorio uses `; version=N` at
+    # the top of config.ini as a validity check — without it the file
+    # is "invalid contents" and the user is prompted to reset. As of
+    # Factorio 2.0 the value is 13. configparser strips all comments
+    # on read, so every seed would nuke the marker if we didn't re-add
+    # it here.
+    contents = cfg_path.read_text()
+    if not contents.lstrip().startswith("; version="):
+        cfg_path.write_text(f"; version={CONFIG_INI_VERSION}\n" + contents)
     print(f"seed: config.ini [path] at {cfg_path}", file=sys.stderr)
 
 
