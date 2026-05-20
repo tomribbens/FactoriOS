@@ -1,4 +1,7 @@
-"""Per-user profiles. A profile is one Factorio --write-data target.
+"""Per-user, per-build profiles. A profile *is* a complete Factorio
+write-data dir — its directory gets symlinked in as ~/.factorio before
+launch so saves, config, mods, player-data.json, achievements.dat, and
+everything else Factorio writes are scoped to the chosen profile.
 
 Authenticated users get per-build profile trees:
     users/<u>/profiles/<build>/<name>/
@@ -69,21 +72,22 @@ def launch(
 ) -> subprocess.Popen:
     """Spawn Factorio. Returns the Popen so the caller can wait().
 
-    Profile separation is by mod directory only — Factorio's
-    --mod-directory is universally recognized across builds, while
-    --write-data is not (vanilla failed with `Option "write-data" does
-    not exist`). Saves and config live at the default location
-    (~/.factorio/{saves,config}) and are shared across profiles.
+    Profile separation is full — the profile directory IS the Factorio
+    write-data dir. Before launch we symlink ~/.factorio at it, so
+    saves, config, mods, player-data.json, achievements.dat, and
+    everything else Factorio writes lands inside the profile. Switching
+    profiles re-points the symlink; no CLI flags are needed beyond
+    --config.
 
     If `session` has cached factorio.com credentials we seed them into
     ~/.factorio/player-data.json so the in-game mod portal works without
     a second login. (These aren't CLI flags — only fields in the JSON.)
     """
     ensure(username, profile, build=build)
-    # Point ~/.factorio at the per-user data dir so each factorio.com
-    # account gets its own saves/config/player-data — the appliance runs
-    # as a single Unix user, so without this everything would be shared.
-    _link_home_factorio(username)
+    # Point ~/.factorio at the chosen profile so each profile gets its
+    # own saves/config/mods/player-data — the appliance runs as a single
+    # Unix user, so without this every profile would share state.
+    _link_home_factorio(username, profile, build)
     # If Factorio's in-game updater bumped the install since we last
     # touched it, the on-disk directory name is stale. Reconcile before
     # exec — versions.reconcile renames the dir to match `factorio
@@ -98,65 +102,85 @@ def launch(
     if session:
         _seed_service_credentials(session)
     _seed_config_ini()
-    _evict_stale_achievements(username, version_id, build)
+    _evict_stale_achievements(username, profile, build, version_id)
     binary = paths.factorio_binary(version_id)
-    mod_dir = paths.profile_dir(username, profile, build=build) / "mods"
     # --config is honored even when it points at an absolute path
     # (config-path.cfg's `config-path` key silently ignores absolutes;
     # only --config does). Our seeded config.ini has [path] read-data
     # pointing back into the install tree and write-data resolving to
-    # __PATH__system-write-data__ (= ~/.factorio, then symlinked per-user).
+    # __PATH__system-write-data__ (= ~/.factorio, then symlinked at the
+    # current profile). Mods land at the default ~/.factorio/mods so no
+    # --mod-directory flag is needed.
     config_ini = Path.home() / ".factorio" / "config" / "config.ini"
     return subprocess.Popen(
-        [
-            str(binary),
-            "--config", str(config_ini),
-            "--mod-directory", str(mod_dir),
-        ],
+        [str(binary), "--config", str(config_ini)],
         env=_factorio_env(),
     )
 
 
-def _link_home_factorio(username: str) -> None:
-    """Make ~/.factorio resolve to the per-user data dir.
+def _link_home_factorio(username: str, profile: str, build: str | None) -> None:
+    """Make ~/.factorio resolve to the chosen profile's directory.
 
-    On a multi-user appliance with one shared Unix account, Factorio
-    would otherwise smash everyone's saves/config/player-data together.
-    Symlinking before launch is the cleanest fix that doesn't depend on
-    Factorio CLI flags.
+    On a multi-user, multi-profile appliance with one shared Unix
+    account, Factorio would otherwise smash everyone's saves/config/
+    player-data together. Symlinking the profile dir as ~/.factorio
+    before launch is the cleanest fix that doesn't depend on Factorio
+    CLI flags.
 
-    Migration: if ~/.factorio already exists as a real directory (from
-    an older single-user install where everything lived there), move it
-    to the current user's per-user dir on first run. Refuses to do this
-    if the per-user dir already has content — that case is ambiguous
-    enough to deserve a manual decision.
+    Two migrations are handled here, both one-shot:
+
+    1. ~/.factorio is a real directory (extremely old single-user
+       layout): refuse and ask the user to move it aside — too
+       ambiguous to claim it for any specific user/profile.
+    2. users/<u>/factorio/ exists (older per-user but not per-profile
+       layout): fold its contents into the profile being launched.
+       The first profile a user launches after the refactor wins the
+       legacy data; subsequent profiles start empty. Acceptable for a
+       joke kiosk where realistic users have one profile.
     """
-    user_fac = paths.user_factorio_dir(username)
+    target = paths.profile_dir(username, profile, build=build)
     home_fac = Path.home() / ".factorio"
 
+    # --- legacy users/<u>/factorio/ migration --------------------------
+    legacy_factorio = paths.user_factorio_dir(username)
+    legacy_sidecar = paths.user_dir(username) / "achievements-version.txt"
+    if legacy_factorio.is_dir() and not legacy_factorio.is_symlink():
+        target.mkdir(parents=True, exist_ok=True)
+        for item in legacy_factorio.iterdir():
+            dst = target / item.name
+            if not dst.exists():
+                item.rename(dst)
+        try:
+            legacy_factorio.rmdir()
+        except OSError:
+            pass  # Non-empty: leftovers were already in the new profile.
+    if legacy_sidecar.exists():
+        new_sidecar = target / "achievements-version.txt"
+        if not new_sidecar.exists():
+            target.mkdir(parents=True, exist_ok=True)
+            legacy_sidecar.rename(new_sidecar)
+
+    # --- ~/.factorio symlink ------------------------------------------
     if home_fac.is_symlink():
-        # Already managed — repoint to whichever user is launching now.
+        # Already managed — repoint to whichever profile is launching now.
         home_fac.unlink()
     elif home_fac.is_dir():
-        # Pre-existing shared data. Migrate it into the current user's
-        # per-user dir if that dir doesn't already exist.
-        if user_fac.exists():
-            raise RuntimeError(
-                f"~/.factorio is a real directory and {user_fac} already "
-                f"exists; can't decide which to keep — move one aside manually"
-            )
-        user_fac.parent.mkdir(parents=True, exist_ok=True)
-        home_fac.rename(user_fac)
+        raise RuntimeError(
+            f"~/.factorio is a real directory; move it aside manually so "
+            f"profile {profile} can claim the symlink"
+        )
     elif home_fac.exists():
         raise RuntimeError(f"{home_fac} exists and is neither symlink nor directory")
 
-    user_fac.mkdir(parents=True, exist_ok=True)
-    home_fac.symlink_to(user_fac, target_is_directory=True)
+    target.mkdir(parents=True, exist_ok=True)
+    home_fac.symlink_to(target, target_is_directory=True)
 
 
-def _evict_stale_achievements(username: str, version_id: str, build: str | None) -> None:
-    """Delete the user's achievements.dat if it was written by a different
-    Factorio version than the one we're about to launch.
+def _evict_stale_achievements(
+    username: str, profile: str, build: str | None, version_id: str,
+) -> None:
+    """Delete the profile's achievements.dat if it was written by a
+    different Factorio version than the one we're about to launch.
 
     Factorio stores a Map-version header inside achievements.dat. If we
     launch a binary that doesn't recognise that header (different game
@@ -164,10 +188,8 @@ def _evict_stale_achievements(username: str, version_id: str, build: str | None)
     Local achievements might be lost." — a benign one-time warning per
     version, but annoying when testing across versions.
 
-    Tracked via a tiny sidecar file rather than reusing last-launch.json,
-    which the chooser saves BEFORE launch (so it always already matches
-    `version_id` by the time we get here). The sidecar is updated after
-    we evict so a same-version relaunch is a no-op.
+    Tracked via a sidecar inside the profile dir. Same-version relaunches
+    are no-ops; cross-profile launches don't interfere with each other.
 
     Demo (no build dimension) is skipped — guest data isn't worth the
     extra plumbing.
@@ -181,7 +203,8 @@ def _evict_stale_achievements(username: str, version_id: str, build: str | None)
     if not version_id.endswith(suffix):
         return
     current = version_id[: -len(suffix)]
-    sidecar = paths.user_dir(username) / "achievements-version.txt"
+    profile_root = paths.profile_dir(username, profile, build=build)
+    sidecar = profile_root / "achievements-version.txt"
     last = None
     try:
         last = sidecar.read_text().strip()
@@ -189,15 +212,15 @@ def _evict_stale_achievements(username: str, version_id: str, build: str | None)
         pass
     if last == current:
         return
-    ach = paths.user_factorio_dir(username) / "achievements.dat"
+    ach = profile_root / "achievements.dat"
     if ach.exists():
         ach.unlink()
         print(
-            f"evict: dropped achievements.dat (was {last or 'untracked'}, "
-            f"launching {current})",
+            f"evict: dropped achievements.dat for profile {profile!r} "
+            f"(was {last or 'untracked'}, launching {current})",
             file=sys.stderr,
         )
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    profile_root.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(current)
 
 

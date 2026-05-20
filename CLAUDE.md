@@ -28,19 +28,19 @@ No local Linux user accounts are ever created. One shared system user runs sessi
     <version>-<build>/             # build ∈ {vanilla, space-age}; shared
     _demo/                         # demo install; no build dimension
   users/<factorio-username>/
-    profiles/<build>/<name>/mods/  # per-build, per-profile MOD directory
-    factorio/                      # per-user ~/.factorio (saves, config,
-                                   # player-data.json, achievements …)
+    profiles/<build>/<name>/       # full Factorio write-data dir per
+                                   # profile — saves/, mods/, config/,
+                                   # player-data.json, achievements.dat …
     session.json                   # {"username": ..., "token": ...}
+    last-launch.json               # remembered (build, version, profile)
   users/_guest/
-    profiles/<n>/mods/             # guest/demo profiles (flat — no build dim)
-    factorio/                      # demo's ~/.factorio
+    profiles/<n>/                  # guest/demo profiles (flat — no build dim)
   last-user                        # present iff Remember Me
 ```
 
 `launcher/factorios_launcher/paths.py` is the single source of truth — don't hard-code these elsewhere. Build identifiers are `vanilla` / `space-age` user-facing; the factorio.com download API uses `alpha` / `expansion` — the mapping lives in `paths.BUILD_API` and the rest of the codebase never deals in alpha/expansion. Profiles are per-build because mod compatibility differs across the two; the guest/demo flow is flat (no build dim) because the demo is its own build.
 
-**Two granularity levels:** per-user (everything in `~/.factorio`: saves, config, achievements, `player-data.json` with the service token) is segregated by symlinking `~/.factorio` at `users/<u>/factorio/` before launch. Per-profile (mods only) is segregated by passing `--mod-directory <profile>/mods` on the Factorio command line. `~/.factorio` is the only CLI flag we use (we tried `--write-data` and it isn't recognized by all Factorio builds; service-credential flags don't exist — `service-username`/`service-token` are JSON fields, not CLI args). `profiles._link_home_factorio()` migrates a pre-existing real `~/.factorio` into the current user's dir on first run; refuses if both exist.
+**A profile is a complete Factorio write-data dir.** Before launch, `profiles._link_home_factorio()` symlinks `~/.factorio` at `users/<u>/profiles/<build>/<name>/`, so saves, mods, config, `player-data.json`, achievements, and everything else Factorio writes is scoped to the chosen profile. Switching profiles re-points the symlink; the only Factorio CLI flag we pass is `--config /home/factorios/.factorio/config/config.ini`, which reaches the same profile through the symlink. (We tried `--write-data` — not universally recognised — and `--mod-directory` — works but redundant once the whole profile is `~/.factorio`. Service credentials are JSON fields in `player-data.json`, not CLI args.) A one-shot migration on first launch folds any pre-existing `users/<u>/factorio/` content into whichever profile launches first.
 
 Space Age ownership lives on `Session.has_space_age` (refreshed on every `login()` / `validate()` via a HEAD probe against the expansion download endpoint, never persisted). The chooser hides the Build selector when `has_space_age == False`.
 

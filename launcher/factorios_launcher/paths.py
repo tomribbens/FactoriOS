@@ -51,9 +51,11 @@ def profile_dir(username: str, profile: str, build: str | None = None) -> Path:
 
 
 def user_factorio_dir(username: str) -> Path:
-    """Per-user ~/.factorio target. Holds saves, config, player-data,
-    achievements — everything Factorio writes outside the mod directory.
-    Symlinked from ~/.factorio at launch (see profiles._link_home_factorio)."""
+    """LEGACY pre-per-profile path: a user-level ~/.factorio target that
+    sat above all of the user's profiles. Kept for the one-shot migration
+    in profiles._link_home_factorio that folds its contents into whichever
+    profile launches first. New code should not write here — the profile
+    directory IS the Factorio write-data dir now (paths.profile_dir)."""
     return user_dir(username) / "factorio"
 
 

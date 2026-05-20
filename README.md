@@ -58,14 +58,16 @@ There are no local Linux user accounts. A single system user (`factorios`) runs 
     _demo/                       # demo install (no build dimension)
   users/<factorio-username>/
     profiles/
-      vanilla/<profile-name>/    # per-build profile (mods, saves, config)
-      space-age/<profile-name>/
+      vanilla/<profile-name>/    # full Factorio write-data dir per
+      space-age/<profile-name>/  # profile — saves, mods, config, achievements,
+                                 # player-data, scenarios …
     session.json                 # cached factorio.com session cookies
+    last-launch.json             # remembered (build, version, profile)
   users/_guest/profiles/<name>/  # guest/demo profiles (flat — no build dim)
   last-user                      # only present when Remember Me was checked
 ```
 
-Profiles are per-build because mod compatibility differs across Vanilla and Space Age. Space Age ownership is detected at login time via a HEAD probe against the expansion download endpoint; if you only own Vanilla, the greeter hides the Build selector entirely.
+A profile is a complete Factorio write-data dir — switching profiles re-symlinks `~/.factorio` at the chosen one, so each profile gets its own saves, mods, config, achievements, and player-data. Profiles are per-build because mod compatibility differs across Vanilla and Space Age. Space Age ownership is detected at login time via a HEAD probe against the expansion download endpoint; if you only own Vanilla, the greeter hides the Build selector entirely.
 
 ## Build
 
