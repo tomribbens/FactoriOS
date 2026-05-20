@@ -9,13 +9,20 @@ post_install() {
     echo
     echo "FactoriOS installed. Enable the session with:"
     echo "  systemctl enable factorios.service"
+    echo "  systemctl enable factorios-performance.service"
     echo
 }
 
 post_upgrade() {
     systemctl daemon-reload
+    # factorios-performance.service ships from v1.2 onward. Enable +
+    # start it on upgrade so existing installs pick up the always-on
+    # gamemode-style tuning without a reinstall. Idempotent on later
+    # upgrades.
+    systemctl enable --now factorios-performance.service 2>/dev/null || true
 }
 
 pre_remove() {
     systemctl disable factorios.service 2>/dev/null || true
+    systemctl disable factorios-performance.service 2>/dev/null || true
 }

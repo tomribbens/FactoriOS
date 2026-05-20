@@ -277,6 +277,7 @@ ENTRY
 systemctl enable NetworkManager.service
 systemctl enable seatd.service
 systemctl enable factorios.service
+systemctl enable factorios-performance.service
 systemctl set-default graphical.target
 
 # Add the [factorios] repo so pacman -Syu can pull updates to our own

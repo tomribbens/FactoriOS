@@ -1,0 +1,15 @@
+[Unit]
+Description=FactoriOS performance tuning (always-on gamemode-style optimizations)
+# Run before the kiosk session so the governor + sysctls are already
+# in effect by the time Factorio's first frame is drawn.
+Before=factorios.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/factorios-performance
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

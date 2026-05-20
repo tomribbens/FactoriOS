@@ -26,19 +26,25 @@ source=()
 install=factorios-base.install
 
 prepare() {
-    cp "$startdir/../../systemd/factorios.service"          "$srcdir/factorios.service"
-    cp "$startdir/../../systemd/factorios-session"          "$srcdir/factorios-session"
-    cp "$startdir/../../systemd/factorios-tmpfiles.conf"    "$srcdir/factorios-tmpfiles.conf"
-    cp "$startdir/../../systemd/factorios-sysusers.conf"    "$srcdir/factorios-sysusers.conf"
-    cp "$startdir/../../systemd/factorios-pacman.sudoers"   "$srcdir/factorios-pacman.sudoers"
-    cp "$startdir/../../systemd/factorios-labwc-rc.xml"     "$srcdir/factorios-labwc-rc.xml"
+    cp "$startdir/../../systemd/factorios.service"             "$srcdir/factorios.service"
+    cp "$startdir/../../systemd/factorios-session"             "$srcdir/factorios-session"
+    cp "$startdir/../../systemd/factorios-performance"         "$srcdir/factorios-performance"
+    cp "$startdir/../../systemd/factorios-performance.service" "$srcdir/factorios-performance.service"
+    cp "$startdir/../../systemd/factorios-tmpfiles.conf"       "$srcdir/factorios-tmpfiles.conf"
+    cp "$startdir/../../systemd/factorios-sysusers.conf"       "$srcdir/factorios-sysusers.conf"
+    cp "$startdir/../../systemd/factorios-pacman.sudoers"      "$srcdir/factorios-pacman.sudoers"
+    cp "$startdir/../../systemd/factorios-labwc-rc.xml"        "$srcdir/factorios-labwc-rc.xml"
 }
 
 package() {
     install -Dm644 "$srcdir/factorios.service" \
         "$pkgdir/usr/lib/systemd/system/factorios.service"
+    install -Dm644 "$srcdir/factorios-performance.service" \
+        "$pkgdir/usr/lib/systemd/system/factorios-performance.service"
     install -Dm755 "$srcdir/factorios-session" \
         "$pkgdir/usr/bin/factorios-session"
+    install -Dm755 "$srcdir/factorios-performance" \
+        "$pkgdir/usr/bin/factorios-performance"
     install -Dm644 "$srcdir/factorios-tmpfiles.conf" \
         "$pkgdir/usr/lib/tmpfiles.d/factorios.conf"
     install -Dm644 "$srcdir/factorios-sysusers.conf" \
