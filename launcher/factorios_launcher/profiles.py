@@ -219,9 +219,13 @@ def _seed_config_ini() -> None:
     cfg.set("path", "read-data", "__PATH__executable__/../../data")
     cfg.set("path", "write-data", "__PATH__system-write-data__")
     # Drop a stale [other] check-updates=false from previous seeds —
-    # if left behind, Factorio still rejects the file as invalid.
+    # if left behind, Factorio rejects the file as invalid. Also drop
+    # the [other] section itself if it'd be empty after that, since
+    # an empty section header may also count as "invalid contents".
     if cfg.has_section("other") and cfg.has_option("other", "check-updates"):
         cfg.remove_option("other", "check-updates")
+    if cfg.has_section("other") and not cfg.options("other"):
+        cfg.remove_section("other")
     with cfg_path.open("w") as f:
         cfg.write(f, space_around_delimiters=False)
     print(f"seed: config.ini [path] at {cfg_path}", file=sys.stderr)

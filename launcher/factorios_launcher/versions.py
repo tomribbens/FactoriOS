@@ -101,12 +101,18 @@ def ensure_system_data_mode(version_id: str) -> None:
     still fails the property-tree parse at startup, so reset it to
     the shipped defaults to be safe across retrofits.
 
+    use-system-read-write-data-directories is set to true to match the
+    write-data=__PATH__system-write-data__ value we put in config.ini.
+    Factorio appears to flag the file as "invalid contents" if the two
+    are mismatched (portable bootstrap + system-style write-data in
+    config.ini, or vice versa).
+
     Idempotent: re-called on every launch.
     """
     cfg = paths.version_dir(version_id) / "config-path.cfg"
     cfg.write_text(
         "config-path=__PATH__executable__/../../config\n"
-        "use-system-read-write-data-directories=false\n"
+        "use-system-read-write-data-directories=true\n"
     )
 
 
